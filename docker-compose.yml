@@ -1,0 +1,20 @@
+services:
+  collector:
+    build: ./collector
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    environment:
+      DATA_DIR: /data
+      ALLOWED_CHAT_JIDS: ""   # comma-separated JIDs to monitor; empty = all chats
+
+  processor:
+    build: ./processor
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    ports:
+      - "8080:8080"   # manual trigger endpoint

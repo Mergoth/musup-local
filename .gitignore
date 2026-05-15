@@ -1,0 +1,6 @@
+.env
+data/
+collector/node_modules/
+collector/dist/
+processor/.gradle/
+processor/build/

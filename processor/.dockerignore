@@ -1,0 +1,6 @@
+.gradle
+build/classes
+build/kotlin
+build/tmp
+build/generated
+.git
