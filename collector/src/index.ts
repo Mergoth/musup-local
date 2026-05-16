@@ -120,16 +120,19 @@ async function startCollector() {
       const normalized = normalizeMessage(message);
       if (!normalized) continue;
       if (normalized.chatJid === "status@broadcast") continue;
-      if (!isAllowedChat(normalized.chatJid)) continue;
-      if (!normalized.text) continue;
 
+      // Resolve and persist the JID → name mapping for every seen chat,
+      // regardless of whether it is in the allow-list. This keeps chats.json
+      // complete so the user can look up JIDs when configuring ALLOWED_CHAT_JIDS.
       const chatName = await resolveChatName(
         sock,
         normalized.chatJid,
         message.pushName ?? undefined
       );
-
       registerChatName(normalized.chatJid, chatName);
+
+      if (!isAllowedChat(normalized.chatJid)) continue;
+      if (!normalized.text) continue;
 
       try {
         appendMessage(normalized, chatName);

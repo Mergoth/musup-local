@@ -21,9 +21,10 @@ musup:
     - ${TELEGRAM_CHAT_ID_1}
     - ${TELEGRAM_CHAT_ID_2:""}
 
-  # Comma-separated WhatsApp group JIDs to include in digest (empty = all captured chats)
+  # WhatsApp group JIDs to include in digest (empty = all captured chats)
+  # Set via MUSUP_CHAT_JIDS env var (comma-separated) to keep JIDs out of git.
   chat-jids: []
 
-  # Optional human-readable label overrides: "jid1=Label One,jid2=Label Two"
-  # Falls back to chatName captured by collector when not set here.
+  # Human-readable label overrides: "jid1=Label One,jid2=Label Two"
+  # Set via MUSUP_CHAT_LABELS_CSV env var to keep labels out of git.
   chat-labels-csv: ""

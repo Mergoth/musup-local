@@ -6,7 +6,6 @@ services:
       - ./data:/data
     environment:
       DATA_DIR: /data
-      ALLOWED_CHAT_JIDS: ""   # comma-separated JIDs to monitor; empty = all chats
 
   processor:
     build: ./processor
