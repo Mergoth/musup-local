@@ -1,0 +1,19 @@
+services:
+  collector:
+    image: musup-collector:latest
+    restart: unless-stopped
+    volumes:
+      - /volume1/docker/musup/data:/data
+    environment:
+      DATA_DIR: /data
+
+  processor:
+    image: musup-processor:latest
+    restart: unless-stopped
+    volumes:
+      - /volume1/docker/musup/data:/data
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    ports:
+      - "8080:8080"

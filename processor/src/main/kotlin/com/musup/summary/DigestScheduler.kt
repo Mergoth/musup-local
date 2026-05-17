@@ -32,6 +32,11 @@ open class DigestScheduler(
             runDigest()
         } catch (e: Exception) {
             log.error("Scheduled digest failed", e)
+            try {
+                telegramClient.sendMessage("⚠️ musup digest error: ${e.javaClass.simpleName}: ${e.message}")
+            } catch (te: Exception) {
+                log.error("Failed to send error notification to Telegram", te)
+            }
         }
     }
 
@@ -48,9 +53,6 @@ open class DigestScheduler(
 
         if (messages.isEmpty()) {
             log.info("No new messages in window")
-            val noMsgText =
-                "За последние ${config.digestWindowHours} ч. в выбранных WhatsApp-чатах новых сообщений нет."
-            telegramClient.sendMessage(noMsgText)
             return DigestResult(
                 status = "no_messages",
                 messageCount = 0,

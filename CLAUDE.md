@@ -90,9 +90,42 @@ curl -X POST http://localhost:8080/jobs/whatsapp-summary
 Start the collector, send any message to the group, then check `data/chats.json`.
 The JID is the key (e.g. `120363421703374121@g.us`).
 
+## Deploy
+
+```bash
+# Deploy only the processor (most common)
+bash deploy.sh processor
+
+# Deploy everything
+bash deploy.sh all
+```
+
+Requires `deploy.local.sh` (git-ignored). Copy from `deploy.local.sh.example`.
+
+The NAS JVM takes ~90 seconds to start. Don't assume the processor is ready
+immediately after `docker compose up -d`. Poll the logs or wait before triggering.
+
+Manual digest trigger on NAS (after processor is up):
+```bash
+ssh -p <PORT> <USER>@<HOST> "curl -s -X POST http://localhost:8080/jobs/whatsapp-summary"
+```
+
 ## Tech stack
 
 | Component | Runtime | Key libraries |
 |---|---|---|
 | collector | Node.js 20 | Baileys (WhatsApp WS), TypeScript |
 | processor | JVM 22 (GraalVM) | Micronaut 4, Jackson, Quartz |
+
+## Claude notes
+
+- **Never use `run_in_background: true` with `logs -f` or polling `until` loops** —
+  they spawn orphaned terminal sessions that persist after the task is done.
+  Use synchronous commands for log tailing, or tail with `--tail=N` (no `-f`).
+- **The `/health` endpoint does not exist** — don't poll it for readiness.
+  Use `docker logs` and look for "Startup completed" instead.
+- **MessageStore timestamp filter is exclusive on the upper bound** (`timestamp >= toTs`
+  is skipped). Fake test messages need `timestamp = now - 120` or similar to land
+  inside the window.
+- **`deploy.local.sh.example` must never contain real values** — usernames, hostnames,
+  ports, paths. Placeholders only.
