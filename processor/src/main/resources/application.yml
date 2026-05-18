@@ -10,8 +10,8 @@ musup:
   llm-api-key: ${LLM_API_KEY}
 
   # Quartz cron (UTC): second minute hour dom month dow
-  # 06:00 and 19:00 UTC = 08:00 and 21:00 Madrid (winter), 08:00 and 21:00 CEST (summer)
-  digest-cron: "0 0 6,19 * * ?"
+  # 06:00 and 17:00 UTC = 08:00 and 19:00 Madrid (winter), 08:00 and 19:00 CEST (summer)
+  digest-cron: "0 0 6,17 * * ?"
 
   # Hours to look back on each run (covers gap between the two daily runs)
   digest-window-hours: 13
