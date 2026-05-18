@@ -14,6 +14,8 @@ import {
   registerChatName,
   appendMessage,
 } from "./store.js";
+import { startClassroomPoller } from "./sources/classroom.js";
+import { startIpasenPoller } from "./sources/ipasen.js";
 
 function isAllowedChat(chatJid: string): boolean {
   if (config.allowedChatJids.length === 0) return true;
@@ -159,3 +161,6 @@ startCollector().catch((err) => {
   appLogger.error("Fatal collector error", err);
   process.exit(1);
 });
+
+startClassroomPoller();
+startIpasenPoller();

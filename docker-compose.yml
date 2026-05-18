@@ -4,8 +4,17 @@ services:
     restart: unless-stopped
     volumes:
       - ./data:/data
+    env_file: .env
     environment:
       DATA_DIR: /data
+      # Google Classroom (optional — leave unset to disable)
+      CLASSROOM_CREDENTIALS_PATH: /data/auth/classroom-credentials.json
+      CLASSROOM_TOKEN_PATH: /data/auth/classroom-token.json
+      # CLASSROOM_POLL_INTERVAL_MINUTES: "30"
+      # iPasen (optional — leave unset to disable)
+      # IPASEN_USERNAME: ""
+      # IPASEN_PASSWORD: ""
+      # IPASEN_POLL_INTERVAL_MINUTES: "60"
 
   processor:
     build: ./processor
