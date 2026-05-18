@@ -52,9 +52,9 @@ docker compose up -d --build processor
 
 ## Credits
 
-Original idea and implementation by **Andrii Artemenko**. The cloud (GCP) version of this system consists of two services:
-
-- [musup-firestore-pump](https://github.com/ArtemenkoAndrii/musup-firestore-pump) — WhatsApp → Pub/Sub → Firestore
+Original idea and implementation by **Andrii Artemenko**. The cloud (GCP) version of this system consists of 3 services:
+- [musup-collector](https://github.com/ArtemenkoAndrii/musup-collector) - reads from WhatsApp on behalf of user
+- [musup-firestore-pump](https://github.com/ArtemenkoAndrii/musup-firestore-pump) — Pub/Sub → Firestore
 - [musup-processor](https://github.com/ArtemenkoAndrii/musup-processor) — reads Firestore (last 24 h), summarises with LLM, sends to Telegram
 
 This repo is a local/NAS adaptation that replaces GCP infrastructure with local files and Docker Compose.
