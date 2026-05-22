@@ -1,10 +1,6 @@
 # musup-local
 
 <p align="center">
-  <a href="https://github.com/sponsors/Mergoth">
-    <img src="https://img.shields.io/badge/❤️ Sponsor on GitHub-%23EA4AAA?style=for-the-badge&logo=github-sponsors&logoColor=white" alt="Sponsor on GitHub"/>
-  </a>
-  &nbsp;
   <a href="https://ko-fi.com/Mergoth">
     <img src="https://img.shields.io/badge/☕ Buy me a coffee-%23FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"/>
   </a>
