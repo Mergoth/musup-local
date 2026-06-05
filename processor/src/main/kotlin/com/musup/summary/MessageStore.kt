@@ -22,7 +22,12 @@ class MessageStore(private val config: SummaryConfig) {
     // Loaded from disk on first access.
     private val processedIds: MutableSet<String> by lazy { loadProcessed() }
 
-    fun loadMessages(fromTs: Long, toTs: Long): List<WhatsappMessage> {
+    fun loadMessages(
+        fromTs: Long,
+        toTs: Long,
+        chatJids: List<String> = config.chatJids,
+        chatLabels: Map<String, String> = config.chatLabels
+    ): List<WhatsappMessage> {
         val fromDate = LocalDate.ofInstant(Instant.ofEpochSecond(fromTs), ZoneOffset.UTC)
         val toDate = LocalDate.ofInstant(Instant.ofEpochSecond(toTs), ZoneOffset.UTC)
 
@@ -38,14 +43,14 @@ class MessageStore(private val config: SummaryConfig) {
         while (!date.isAfter(toDate)) {
             val file = File(dir, "${date}.ndjson")
             if (file.exists()) {
-                result += parseFile(file, fromTs, toTs)
+                result += parseFile(file, fromTs, toTs, chatLabels)
             }
             date = date.plusDays(1)
         }
 
         val filtered = result
             .filter { it.messageId !in processedIds }
-            .filter { config.chatJids.isEmpty() || it.chatJid in config.chatJids }
+            .filter { chatJids.isEmpty() || it.chatJid in chatJids }
             .sortedBy { it.timestamp }
 
         log.info(
@@ -62,7 +67,7 @@ class MessageStore(private val config: SummaryConfig) {
         log.info("Marked {} message(s) as processed (total: {})", ids.size, processedIds.size)
     }
 
-    private fun parseFile(file: File, fromTs: Long, toTs: Long): List<WhatsappMessage> {
+    private fun parseFile(file: File, fromTs: Long, toTs: Long, chatLabels: Map<String, String>): List<WhatsappMessage> {
         val messages = mutableListOf<WhatsappMessage>()
 
         file.forEachLine { line ->
@@ -82,7 +87,7 @@ class MessageStore(private val config: SummaryConfig) {
 
                 val chatJid = node.path("chatJid").asText("")
                 val chatName = node.path("chatName").asText(chatJid)
-                val chatLabel = config.chatLabels[chatJid] ?: chatName
+                val chatLabel = chatLabels[chatJid] ?: chatName
 
                 messages += WhatsappMessage(
                     messageId = messageId,

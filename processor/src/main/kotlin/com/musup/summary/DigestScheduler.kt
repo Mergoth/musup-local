@@ -20,7 +20,8 @@ open class DigestScheduler(
     private val messageStore: MessageStore,
     private val promptBuilder: PromptBuilder,
     private val llmClient: LlmClient,
-    private val telegramClient: TelegramClient
+    private val telegramClient: TelegramClient,
+    private val adminConfigReader: AdminConfigReader
 ) {
 
     private val log = LoggerFactory.getLogger(DigestScheduler::class.java)
@@ -44,37 +45,29 @@ open class DigestScheduler(
         val now = Instant.now()
         val from = now.minusSeconds(config.digestWindowHours * 3600)
 
-        log.info(
-            "Running digest: window [{}, {}], chats={}",
-            from, now, config.chatJids.size
-        )
+        val adminCfg = adminConfigReader.read()
+        val effectiveChatJids = adminCfg?.processorChatJids?.takeIf { it.isNotEmpty() } ?: config.chatJids
+        val effectiveTelegramIds = adminCfg?.telegramChatIds?.takeIf { it.isNotEmpty() } ?: config.telegramChatIds
+        val effectiveChatLabels = adminCfg?.chatLabels?.takeIf { it.isNotEmpty() } ?: config.chatLabels
 
-        val messages = messageStore.loadMessages(from.epochSecond, now.epochSecond)
+        log.info("Running digest: window [{}, {}], chats={}", from, now, effectiveChatJids.size)
+
+        val messages = messageStore.loadMessages(from.epochSecond, now.epochSecond, effectiveChatJids, effectiveChatLabels)
 
         if (messages.isEmpty()) {
             log.info("No new messages in window")
-            return DigestResult(
-                status = "no_messages",
-                messageCount = 0,
-                from = from.toString(),
-                to = now.toString()
-            )
+            return DigestResult(status = "no_messages", messageCount = 0, from = from.toString(), to = now.toString())
         }
 
         log.info("Found {} messages, building prompt", messages.size)
         val prompt = promptBuilder.buildPrompt(messages, from, now)
         val summary = llmClient.summarize(prompt)
-        telegramClient.sendMessage(summary)
+        telegramClient.sendMessage(summary, effectiveTelegramIds)
 
         val ids = messages.map { it.messageId }.toSet()
         messageStore.markProcessed(ids)
 
         log.info("Digest complete: {} messages processed", messages.size)
-        return DigestResult(
-            status = "ok",
-            messageCount = messages.size,
-            from = from.toString(),
-            to = now.toString()
-        )
+        return DigestResult(status = "ok", messageCount = messages.size, from = from.toString(), to = now.toString())
     }
 }
