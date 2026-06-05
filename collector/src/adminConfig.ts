@@ -13,7 +13,8 @@ export interface AdminConfig {
 const configFile = path.join(config.dataDir, "config.json");
 
 const defaults: AdminConfig = {
-  allowedChatJids: config.allowedChatJids,
+  // Spread to avoid sharing the array reference with config.allowedChatJids
+  allowedChatJids: [...config.allowedChatJids],
   processorChatJids: [],
   chatLabels: {},
   telegramChatIds: [],
@@ -21,40 +22,70 @@ const defaults: AdminConfig = {
 
 let cached: AdminConfig = { ...defaults };
 
+/**
+ * Read config.json from disk, merge with defaults, and apply type guards.
+ * If a field is present but has the wrong type, the default value is used.
+ */
+function readFromDisk(): AdminConfig {
+  const raw = fs.readFileSync(configFile, "utf-8");
+  const parsed: unknown = JSON.parse(raw);
+  const obj = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+
+  const allowedChatJids = Array.isArray(obj.allowedChatJids)
+    ? (obj.allowedChatJids as string[])
+    : defaults.allowedChatJids;
+  const processorChatJids = Array.isArray(obj.processorChatJids)
+    ? (obj.processorChatJids as string[])
+    : defaults.processorChatJids;
+  const telegramChatIds = Array.isArray(obj.telegramChatIds)
+    ? (obj.telegramChatIds as string[])
+    : defaults.telegramChatIds;
+  const chatLabels =
+    typeof obj.chatLabels === "object" && obj.chatLabels !== null && !Array.isArray(obj.chatLabels)
+      ? (obj.chatLabels as Record<string, string>)
+      : defaults.chatLabels;
+
+  return { allowedChatJids, processorChatJids, telegramChatIds, chatLabels };
+}
+
 export function loadAdminConfig(): AdminConfig {
   if (!fs.existsSync(configFile)) {
     saveAdminConfig(defaults);
     return { ...defaults };
   }
   try {
-    const raw = fs.readFileSync(configFile, "utf-8");
-    cached = { ...defaults, ...JSON.parse(raw) };
+    cached = readFromDisk();
   } catch (err) {
     appLogger.warn("Failed to read config.json, using defaults", { err });
     cached = { ...defaults };
   }
-  return cached;
+  return { ...cached };
 }
 
 export function saveAdminConfig(cfg: AdminConfig): void {
   fs.mkdirSync(path.dirname(configFile), { recursive: true });
   fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2), "utf-8");
-  cached = cfg;
+  // Store a shallow copy so callers cannot mutate our cached state
+  cached = { ...cfg };
 }
 
 export function getAdminConfig(): AdminConfig {
-  return cached;
+  // Return a shallow copy to prevent callers from silently mutating cached state
+  return { ...cached };
 }
 
 export function watchAdminConfig(onChange: (cfg: AdminConfig) => void): void {
+  // Eagerly load so cached is populated before any watch event fires
   loadAdminConfig();
+  // NOTE: fs.watch may not fire on NFS/CIFS (network) mounts such as those
+  // commonly found on NAS devices. On such mounts, manual reload via the
+  // admin API is the fallback.
   fs.watch(configFile, () => {
     try {
-      const raw = fs.readFileSync(configFile, "utf-8");
-      const next: AdminConfig = { ...defaults, ...JSON.parse(raw) };
+      const next = readFromDisk();
       cached = next;
       appLogger.info("Reloaded config.json", { allowedChatJids: next.allowedChatJids.length });
-      onChange(next);
+      onChange({ ...next });
     } catch (err) {
       appLogger.warn("Failed to reload config.json on change", { err });
     }
