@@ -184,7 +184,8 @@ async function saveChats() {
 }
 
 async function saveCfg() {
-  await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+  const res = await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+  if (!res.ok) { alert('Failed to save config. Please try again.'); throw new Error('save failed'); }
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

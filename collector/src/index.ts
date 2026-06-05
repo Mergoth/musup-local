@@ -27,6 +27,14 @@ watchAdminConfig((cfg) => {
   appLogger.info("Hot-reloaded allowedChatJids", { count: cfg.allowedChatJids.length });
 });
 
+// Warn if ALLOWED_CHAT_JIDS env var is set but config.json already exists and overrides it
+const { allowedChatJids: configJsonJids } = getAdminConfig();
+if (config.allowedChatJids.length > 0) {
+  appLogger.info(
+    "ALLOWED_CHAT_JIDS env var is set but config.json takes precedence — manage chat filters via the admin UI at http://localhost:8081"
+  );
+}
+
 function isAllowedChat(chatJid: string): boolean {
   const { allowedChatJids } = getAdminConfig();
   if (allowedChatJids.length === 0) return true;

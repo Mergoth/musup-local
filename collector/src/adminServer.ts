@@ -29,12 +29,13 @@ export function startAdminServer(adminPort: number): void {
 
   const app = express();
   app.use(express.json());
-  app.use(session({
+  const sessionMiddleware = session({
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: { httpOnly: true, sameSite: "lax" },
-  }));
+  });
+  app.use(sessionMiddleware);
 
   // Public routes (no auth required)
   app.use("/login.html", express.static(path.resolve(__dirname, "../public/login.html")));
@@ -117,7 +118,23 @@ export function startAdminServer(adminPort: number): void {
   });
 
   const server = createServer(app);
-  const wss = new WebSocketServer({ server });
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Authenticate WS upgrades via session middleware
+  server.on("upgrade", (req, socket, head) => {
+    // @ts-ignore — express-session types don't cover raw IncomingMessage
+    sessionMiddleware(req, {} as any, () => {
+      // @ts-ignore
+      if (!(req as any).session?.authenticated) {
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        socket.destroy();
+        return;
+      }
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit("connection", ws, req);
+      });
+    });
+  });
 
   connectionEvents.on("update", async (state) => {
     try {
