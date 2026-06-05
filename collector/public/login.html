@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>musup admin — login</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+  .card { background: white; border-radius: 8px; padding: 2rem; width: 320px; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+  h1 { margin: 0 0 1.5rem; font-size: 1.2rem; text-align: center; }
+  label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .3rem; }
+  input { width: 100%; padding: .5rem .7rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: .95rem; margin-bottom: 1rem; }
+  button { width: 100%; padding: .55rem; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: .95rem; cursor: pointer; }
+  .error { color: #dc2626; font-size: .85rem; margin-bottom: .75rem; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>musup admin</h1>
+  <div id="err" class="error" style="display:none"></div>
+  <form onsubmit="doLogin(event)">
+    <label>Username</label>
+    <input type="text" id="u" autocomplete="username" required>
+    <label>Password</label>
+    <input type="password" id="p" autocomplete="current-password" required>
+    <button type="submit">Sign in</button>
+  </form>
+</div>
+<script>
+async function doLogin(e) {
+  e.preventDefault();
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: document.getElementById('u').value, password: document.getElementById('p').value })
+  });
+  if (res.ok) { location.href = '/'; }
+  else { const err = document.getElementById('err'); err.textContent = 'Invalid credentials'; err.style.display = 'block'; }
+}
+</script>
+</body>
+</html>
