@@ -15,24 +15,7 @@ open class TelegramClient(private val config: SummaryConfig) {
     private val mapper = jacksonObjectMapper()
     private val httpClient = HttpClient.newHttpClient()
 
-    fun sendMessage(text: String) {
-        val botToken = config.telegramBotToken
-        val chatIds = config.telegramChatIds
-
-        if (botToken == null || chatIds.isEmpty()) {
-            log.warn("Telegram bot token or chat IDs not configured — message not sent")
-            return
-        }
-
-        val chunks = splitForTelegram(text, maxLength = 3900)
-        log.info("Sending {} chunk(s) to {} Telegram recipient(s)", chunks.size, chatIds.size)
-
-        for (chatId in chatIds) {
-            for (chunk in chunks) {
-                sendChunk(chunk, botToken, chatId)
-            }
-        }
-    }
+    fun sendMessage(text: String) = sendMessage(text, config.telegramChatIds)
 
     fun sendMessage(text: String, chatIds: List<String>) {
         val botToken = config.telegramBotToken
