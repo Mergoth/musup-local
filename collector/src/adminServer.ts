@@ -4,11 +4,12 @@ import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
 import path from "path";
 import { rmSync } from "fs";
+import { randomBytes } from "crypto";
 import QRCode from "qrcode";
 import { config } from "./config.js";
 import { appLogger } from "./appLogger.js";
 import { getConnectionState, connectionEvents } from "./connectionState.js";
-import { loadAdminConfig, saveAdminConfig, getAdminConfig } from "./adminConfig.js";
+import { saveAdminConfig, getAdminConfig } from "./adminConfig.js";
 import { getAllChats } from "./store.js";
 
 declare module "express-session" {
@@ -17,15 +18,19 @@ declare module "express-session" {
   }
 }
 
+const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
+
 export function startAdminServer(adminPort: number): void {
   if (!config.adminPassword) {
     appLogger.warn("ADMIN_PASSWORD is not set — admin UI will be inaccessible. Set ADMIN_PASSWORD env var.");
   }
 
+  const sessionSecret = config.adminPassword || randomBytes(32).toString("hex");
+
   const app = express();
   app.use(express.json());
   app.use(session({
-    secret: config.adminPassword || "changeme",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: { httpOnly: true, sameSite: "lax" },
@@ -42,9 +47,6 @@ export function startAdminServer(adminPort: number): void {
       res.status(401).json({ error: "Invalid credentials" });
     }
   });
-  app.post("/api/logout-session", (req: Request, res: Response) => {
-    req.session.destroy(() => res.json({ ok: true }));
-  });
 
   // Auth guard
   function requireAuth(req: Request, res: Response, next: NextFunction): void {
@@ -58,14 +60,20 @@ export function startAdminServer(adminPort: number): void {
   app.use(express.static(path.resolve(__dirname, "../public")));
 
   // Protected API routes
-  app.get("/api/status", async (_req: Request, res: Response) => {
-    const state = getConnectionState();
-    if (state.qr) {
-      const qrDataUrl = await QRCode.toDataURL(state.qr);
-      res.json({ ...state, qrDataUrl });
-    } else {
-      res.json(state);
-    }
+  app.post("/api/logout-session", (req: Request, res: Response) => {
+    req.session.destroy(() => res.json({ ok: true }));
+  });
+
+  app.get("/api/status", async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const state = getConnectionState();
+      if (state.qr) {
+        const qrDataUrl = await QRCode.toDataURL(state.qr);
+        res.json({ ...state, qrDataUrl });
+      } else {
+        res.json(state);
+      }
+    } catch (e) { next(e); }
   });
 
   app.post("/api/reconnect", (_req: Request, res: Response) => {
@@ -75,10 +83,10 @@ export function startAdminServer(adminPort: number): void {
 
   app.post("/api/logout", (_req: Request, res: Response) => {
     res.json({ ok: true });
-    setTimeout(() => {
-      try { rmSync(config.authDir, { recursive: true, force: true }); } catch (_) {}
+    res.on("finish", () => {
+      try { rmSync(config.authDir, { recursive: true, force: true }); } catch (e) { appLogger.warn("Could not clear auth folder", { e }); }
       process.exit(0);
-    }, 300);
+    });
   });
 
   app.get("/api/chats", (_req: Request, res: Response) => {
@@ -100,10 +108,10 @@ export function startAdminServer(adminPort: number): void {
     const body = req.body;
     const current = getAdminConfig();
     saveAdminConfig({
-      allowedChatJids: Array.isArray(body.allowedChatJids) ? body.allowedChatJids : current.allowedChatJids,
-      processorChatJids: Array.isArray(body.processorChatJids) ? body.processorChatJids : current.processorChatJids,
-      chatLabels: typeof body.chatLabels === "object" && body.chatLabels !== null ? body.chatLabels : current.chatLabels,
-      telegramChatIds: Array.isArray(body.telegramChatIds) ? body.telegramChatIds : current.telegramChatIds,
+      allowedChatJids: isStringArray(body.allowedChatJids) ? body.allowedChatJids : current.allowedChatJids,
+      processorChatJids: isStringArray(body.processorChatJids) ? body.processorChatJids : current.processorChatJids,
+      chatLabels: typeof body.chatLabels === "object" && body.chatLabels !== null && !Array.isArray(body.chatLabels) ? body.chatLabels : current.chatLabels,
+      telegramChatIds: isStringArray(body.telegramChatIds) ? body.telegramChatIds : current.telegramChatIds,
     });
     res.json({ ok: true });
   });
@@ -112,23 +120,27 @@ export function startAdminServer(adminPort: number): void {
   const wss = new WebSocketServer({ server });
 
   connectionEvents.on("update", async (state) => {
-    let payload: Record<string, unknown> = { type: "status", status: state.status };
-    if (state.qr) {
-      payload.qrDataUrl = await QRCode.toDataURL(state.qr);
-    }
-    const msg = JSON.stringify(payload);
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) client.send(msg);
-    });
+    try {
+      let payload: Record<string, unknown> = { type: "status", status: state.status };
+      if (state.qr) {
+        payload.qrDataUrl = await QRCode.toDataURL(state.qr);
+      }
+      const msg = JSON.stringify(payload);
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) client.send(msg);
+      });
+    } catch (e) { appLogger.error("WS push failed", { e }); }
   });
 
   wss.on("connection", async (ws: WebSocket) => {
-    const state = getConnectionState();
-    let payload: Record<string, unknown> = { type: "status", status: state.status };
-    if (state.qr) {
-      payload.qrDataUrl = await QRCode.toDataURL(state.qr);
-    }
-    ws.send(JSON.stringify(payload));
+    try {
+      const state = getConnectionState();
+      let payload: Record<string, unknown> = { type: "status", status: state.status };
+      if (state.qr) {
+        payload.qrDataUrl = await QRCode.toDataURL(state.qr);
+      }
+      ws.send(JSON.stringify(payload));
+    } catch (e) { appLogger.error("WS initial state push failed", { e }); }
   });
 
   server.listen(adminPort, () => {
