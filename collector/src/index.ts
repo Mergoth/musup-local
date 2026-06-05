@@ -5,6 +5,7 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import P from "pino";
 import qrcode from "qrcode-terminal";
+import { rmSync } from "fs";
 import { config } from "./config.js";
 import { normalizeMessage } from "./normalize.js";
 import { appLogger } from "./appLogger.js";
@@ -14,10 +15,20 @@ import {
   registerChatName,
   appendMessage,
 } from "./store.js";
+import { setConnectionState, connectionEvents } from "./connectionState.js";
+import { watchAdminConfig, getAdminConfig } from "./adminConfig.js";
+import { startAdminServer } from "./adminServer.js";
+
+startAdminServer(config.adminPort);
+
+watchAdminConfig((cfg) => {
+  appLogger.info("Hot-reloaded allowedChatJids", { count: cfg.allowedChatJids.length });
+});
 
 function isAllowedChat(chatJid: string): boolean {
-  if (config.allowedChatJids.length === 0) return true;
-  return config.allowedChatJids.includes(chatJid);
+  const { allowedChatJids } = getAdminConfig();
+  if (allowedChatJids.length === 0) return true;
+  return allowedChatJids.includes(chatJid);
 }
 
 function isGroupChat(chatJid: string): boolean {
@@ -66,7 +77,6 @@ async function startCollector() {
 
   appLogger.info("Starting WhatsApp collector", {
     authDir: config.authDir,
-    allowedChatsCount: config.allowedChatJids.length,
   });
 
   const { state, saveCreds } = await useMultiFileAuthState(config.authDir);
@@ -86,12 +96,14 @@ async function startCollector() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      appLogger.info("\nScan this QR with WhatsApp Linked Devices:\n");
+      appLogger.info("QR code available — scan at http://localhost:8081 or check terminal");
       qrcode.generate(qr, { small: true });
+      setConnectionState({ status: "qr_pending", qr });
     }
 
     if (connection === "open") {
       appLogger.info("WhatsApp connected");
+      setConnectionState({ status: "connected" });
     }
 
     if (connection === "close") {
@@ -99,6 +111,7 @@ async function startCollector() {
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
       appLogger.warn("WhatsApp disconnected", { statusCode, shouldReconnect });
+      setConnectionState({ status: "disconnected" });
 
       if (shouldReconnect) {
         setTimeout(() => {
@@ -107,7 +120,12 @@ async function startCollector() {
           });
         }, 5000);
       } else {
-        appLogger.error("Logged out. Delete auth folder and scan QR again.");
+        appLogger.error("Logged out. Clearing auth folder.");
+        try {
+          rmSync(config.authDir, { recursive: true, force: true });
+        } catch (err) {
+          appLogger.warn("Could not clear auth folder", { err });
+        }
         process.exit(1);
       }
     }
@@ -121,9 +139,6 @@ async function startCollector() {
       if (!normalized) continue;
       if (normalized.chatJid === "status@broadcast") continue;
 
-      // Resolve and persist the JID → name mapping for every seen chat,
-      // regardless of whether it is in the allow-list. This keeps chats.json
-      // complete so the user can look up JIDs when configuring ALLOWED_CHAT_JIDS.
       const chatName = await resolveChatName(
         sock,
         normalized.chatJid,
@@ -136,22 +151,16 @@ async function startCollector() {
 
       try {
         appendMessage(normalized, chatName);
-
-        appLogger.debug("Message saved", {
-          chatName,
-          chatJid: normalized.chatJid,
-          senderJid: normalized.senderJid,
-          fromMe: normalized.fromMe,
-          messageType: normalized.messageType,
-          text: normalized.text,
-        });
+        appLogger.debug("Message saved", { chatName, chatJid: normalized.chatJid });
       } catch (err) {
-        appLogger.error("Failed to save message", {
-          err,
-          chatJid: normalized.chatJid,
-        });
+        appLogger.error("Failed to save message", { err, chatJid: normalized.chatJid });
       }
     }
+  });
+
+  connectionEvents.once("reconnect", () => {
+    appLogger.info("Reconnect triggered from admin UI");
+    sock.end(undefined);
   });
 }
 
