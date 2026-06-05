@@ -10,7 +10,7 @@
   h1 { font-size: 1.4rem; margin-bottom: 1.5rem; }
   .card { background: white; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
   .card h2 { margin: 0 0 1rem; font-size: 1.1rem; }
-  .badge { display: inline-block; padding: .25rem .6rem; border-radius: 999px; font-size: .8rem; font-weight: 600; }
+  .badge { display: inline-block; padding: .25rem .6rem; border-radius: 999px; font-size: .8rem; font-weight: 600; background: #e5e7eb; color: #374151; }
   .badge-connected { background: #d1fae5; color: #065f46; }
   .badge-disconnected { background: #fee2e2; color: #991b1b; }
   .badge-qr_pending { background: #fef3c7; color: #92400e; }
@@ -54,7 +54,8 @@
 <div class="card">
   <h2>Chat Subscriptions</h2>
   <p style="font-size:.85rem;color:#6b7280;margin-bottom:.75rem">
-    <strong>Collect</strong> = save messages to disk &nbsp;·&nbsp; <strong>Digest</strong> = include in Telegram summary
+    <strong>Collect</strong> = save messages to disk &nbsp;·&nbsp; <strong>Digest</strong> = include in Telegram summary.<br>
+    <em>Tip: if all boxes in a column are unchecked, that column allows all chats.</em>
   </p>
   <table>
     <thead><tr><th>Name</th><th>JID</th><th>Collect</th><th>Digest</th></tr></thead>
@@ -70,14 +71,25 @@ let cfg = { allowedChatJids: [], processorChatJids: [], chatLabels: {}, telegram
 let chats = [];
 
 async function init() {
-  const [c, ch] = await Promise.all([
-    fetch('/api/config').then(r => r.json()),
-    fetch('/api/chats').then(r => r.json()),
-  ]);
-  cfg = c; chats = ch;
-  renderTelegramTags();
-  renderChats();
-  fetch('/api/status').then(r => r.json()).then(applyStatus);
+  try {
+    const [configRes, chatsRes] = await Promise.all([
+      fetch('/api/config'),
+      fetch('/api/chats'),
+    ]);
+    if (configRes.status === 401 || chatsRes.status === 401) {
+      location.href = '/login.html';
+      return;
+    }
+    if (!configRes.ok || !chatsRes.ok) throw new Error('Server error');
+    cfg = await configRes.json();
+    chats = await chatsRes.json();
+    renderTelegramTags();
+    renderChats();
+  } catch (e) {
+    document.body.innerHTML = `<p style="padding:2rem;color:#dc2626">Failed to load admin UI: ${e.message}. <a href="/login.html">Re-login?</a></p>`;
+    return;
+  }
+  fetch('/api/status').then(r => r.json()).then(applyStatus).catch(() => {});
 }
 
 function connectWs() {
@@ -103,12 +115,21 @@ async function logout() {
 
 function renderTelegramTags() {
   const el = document.getElementById('telegram-tags');
-  if (!cfg.telegramChatIds.length) { el.innerHTML = '<em style="color:#9ca3af">No Telegram chat IDs configured</em>'; return; }
+  if (!cfg.telegramChatIds.length) {
+    el.innerHTML = '<em style="color:#9ca3af">No Telegram chat IDs configured</em>';
+    return;
+  }
   el.innerHTML = '';
   cfg.telegramChatIds.forEach(id => {
     const s = document.createElement('span');
     s.className = 'tag';
-    s.innerHTML = `${esc(id)} <button title="Remove" onclick="removeTelegramId('${esc(id)}')">×</button>`;
+    const text = document.createTextNode(id + ' ');
+    const btn = document.createElement('button');
+    btn.title = 'Remove';
+    btn.textContent = '×';
+    btn.addEventListener('click', () => removeTelegramId(id));
+    s.appendChild(text);
+    s.appendChild(btn);
     el.appendChild(s);
   });
 }

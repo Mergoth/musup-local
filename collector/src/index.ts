@@ -21,6 +21,8 @@ import { startAdminServer } from "./adminServer.js";
 
 startAdminServer(config.adminPort);
 
+let currentSock: any = null;
+
 watchAdminConfig((cfg) => {
   appLogger.info("Hot-reloaded allowedChatJids", { count: cfg.allowedChatJids.length });
 });
@@ -89,6 +91,7 @@ async function startCollector() {
     printQRInTerminal: false,
     syncFullHistory: false,
   });
+  currentSock = sock;
 
   sock.ev.on("creds.update", saveCreds);
 
@@ -158,11 +161,14 @@ async function startCollector() {
     }
   });
 
-  connectionEvents.once("reconnect", () => {
-    appLogger.info("Reconnect triggered from admin UI");
-    sock.end(undefined);
-  });
 }
+
+connectionEvents.on("reconnect", () => {
+  appLogger.info("Reconnect triggered from admin UI");
+  if (currentSock) {
+    currentSock.end(undefined);
+  }
+});
 
 startCollector().catch((err) => {
   appLogger.error("Fatal collector error", err);
