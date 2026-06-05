@@ -14,4 +14,5 @@ export const config = {
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean),
+  adminPort: parseInt(process.env.ADMIN_PORT || "8081", 10),
 };

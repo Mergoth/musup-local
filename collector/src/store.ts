@@ -76,3 +76,7 @@ export function appendMessage(
     throw err;
   }
 }
+
+export function getAllChats(): Map<string, string> {
+  return new Map(chatNameMap);
+}
