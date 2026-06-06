@@ -38,7 +38,7 @@ build_processor() {
 build_image() {
   local service="$1"   # collector | processor
   echo "==> Building image: musup-${service}..."
-  docker build -t "musup-${service}:latest" "${SCRIPT_DIR}/${service}"
+  docker build --platform linux/amd64 -t "musup-${service}:latest" "${SCRIPT_DIR}/${service}"
 }
 
 ship_image() {
