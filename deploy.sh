@@ -52,10 +52,10 @@ ship_image() {
 
 sync_compose() {
   echo "==> Syncing docker-compose and .env to NAS..."
-  scp -P "${NAS_PORT}" \
+  scp -O -P "${NAS_PORT}" \
     "${SCRIPT_DIR}/docker-compose.nas.yml" \
     "${NAS_USER}@${NAS_HOST}:${NAS_DIR}/docker-compose.yml"
-  scp -P "${NAS_PORT}" \
+  scp -O -P "${NAS_PORT}" \
     "${SCRIPT_DIR}/.env" \
     "${NAS_USER}@${NAS_HOST}:${NAS_DIR}/.env"
 }
