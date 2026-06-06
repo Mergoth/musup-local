@@ -72,7 +72,7 @@ processor (Micronaut / Kotlin)
 ## Build & run
 
 ```bash
-# First time: compile processor (requires JDK 22+)
+# First time: compile processor (requires JDK 17+)
 cd processor && ./gradlew clean installDist && cd ..
 
 docker compose build
@@ -115,7 +115,7 @@ ssh -p <PORT> <USER>@<HOST> "curl -s -X POST http://localhost:8080/jobs/whatsapp
 | Component | Runtime | Key libraries |
 |---|---|---|
 | collector | Node.js 20 | Baileys (WhatsApp WS), TypeScript |
-| processor | JVM 22 (GraalVM) | Micronaut 4, Jackson, Quartz |
+| processor | JVM 17 (GraalVM) | Micronaut 4, Jackson, Quartz |
 
 ## Claude notes
 

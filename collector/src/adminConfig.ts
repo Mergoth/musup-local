@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { appLogger } from "./appLogger.js";
-import { config } from "./config.js";
+import { appLogger } from "#src/appLogger.js";
+import { config } from "#src/config.js";
 
 export interface AdminConfig {
   allowedChatJids: string[];
@@ -13,11 +13,10 @@ export interface AdminConfig {
 const configFile = path.join(config.dataDir, "config.json");
 
 const defaults: AdminConfig = {
-  // Spread to avoid sharing the array reference with config.allowedChatJids
   allowedChatJids: [...config.allowedChatJids],
-  processorChatJids: [],
-  chatLabels: {},
-  telegramChatIds: [],
+  processorChatJids: [...config.processorChatJids],
+  chatLabels: { ...config.chatLabels },
+  telegramChatIds: [...config.telegramChatIds],
 };
 
 let cached: AdminConfig = { ...defaults };

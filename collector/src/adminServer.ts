@@ -6,11 +6,11 @@ import path from "path";
 import { rmSync } from "fs";
 import { randomBytes } from "crypto";
 import QRCode from "qrcode";
-import { config } from "./config.js";
-import { appLogger } from "./appLogger.js";
-import { getConnectionState, connectionEvents } from "./connectionState.js";
-import { saveAdminConfig, getAdminConfig } from "./adminConfig.js";
-import { getAllChats } from "./store.js";
+import { config } from "#src/config.js";
+import { appLogger } from "#src/appLogger.js";
+import { getConnectionState, connectionEvents } from "#src/connectionState.js";
+import { saveAdminConfig, getAdminConfig } from "#src/adminConfig.js";
+import { getAllChats } from "#src/store.js";
 
 declare module "express-session" {
   interface SessionData {
@@ -122,8 +122,14 @@ export function startAdminServer(adminPort: number): void {
 
   // Authenticate WS upgrades via session middleware
   server.on("upgrade", (req, socket, head) => {
+    const dummyRes = {
+      writeHead: () => {},
+      setHeader: () => {},
+      getHeader: () => {},
+      end: () => {},
+    } as any;
     // @ts-ignore — express-session types don't cover raw IncomingMessage
-    sessionMiddleware(req, {} as any, () => {
+    sessionMiddleware(req, dummyRes, () => {
       // @ts-ignore
       if (!(req as any).session?.authenticated) {
         socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");

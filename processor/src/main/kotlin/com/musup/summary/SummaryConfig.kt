@@ -7,8 +7,8 @@ open class SummaryConfig {
 
     var dataDir: String = "/data"
 
-    var llmApiUrl: String = "https://api.openai.com/v1/chat/completions"
-    var llmModel: String = "gpt-4o-mini"
+    var llmApiUrl: String = ""
+    var llmModel: String = ""
     var llmApiKey: String = ""
 
     // Quartz cron (6 fields: second minute hour dom month dow)

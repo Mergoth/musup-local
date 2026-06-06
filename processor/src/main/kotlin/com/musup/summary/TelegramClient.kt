@@ -1,6 +1,6 @@
 package com.musup.summary
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.inject.Singleton
 import org.slf4j.LoggerFactory
 import java.net.URI
@@ -9,10 +9,12 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse.BodyHandlers
 
 @Singleton
-open class TelegramClient(private val config: SummaryConfig) {
+open class TelegramClient(
+    private val config: SummaryConfig,
+    private val mapper: ObjectMapper
+) {
 
     private val log = LoggerFactory.getLogger(TelegramClient::class.java)
-    private val mapper = jacksonObjectMapper()
     private val httpClient = HttpClient.newHttpClient()
 
     fun sendMessage(text: String) = sendMessage(text, config.telegramChatIds)

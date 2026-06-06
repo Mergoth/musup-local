@@ -1,6 +1,6 @@
 package com.musup.summary
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.inject.Singleton
 import org.slf4j.LoggerFactory
 import java.net.URI
@@ -9,13 +9,19 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse.BodyHandlers
 
 @Singleton
-open class LlmClient(private val config: SummaryConfig) {
+open class LlmClient(
+    private val config: SummaryConfig,
+    private val mapper: ObjectMapper
+) {
 
     private val log = LoggerFactory.getLogger(LlmClient::class.java)
-    private val mapper = jacksonObjectMapper()
     private val httpClient = HttpClient.newHttpClient()
 
     fun summarize(prompt: String): String {
+        check(config.llmApiUrl.isNotBlank()) { "musup.llm-api-url is not configured!" }
+        check(config.llmModel.isNotBlank()) { "musup.llm-model is not configured!" }
+        check(config.llmApiKey.isNotBlank()) { "musup.llm-api-key is not configured!" }
+
         log.info("Sending prompt to LLM (model={}, length={})", config.llmModel, prompt.length)
 
         val body = mapper.writeValueAsString(

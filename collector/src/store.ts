@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
-import { config } from "./config.js";
-import { appLogger } from "./appLogger.js";
-import type { NormalizedMessage } from "./normalize.js";
+import { config } from "#src/config.js";
+import { appLogger } from "#src/appLogger.js";
+import type { NormalizedMessage } from "#src/normalize.js";
 
 const chatsFile = path.join(config.dataDir, "chats.json");
 const messagesDir = path.join(config.dataDir, "messages");

@@ -1,6 +1,6 @@
 package com.musup.summary
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import jakarta.inject.Singleton
 import org.slf4j.LoggerFactory
@@ -10,17 +10,15 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 
 @Singleton
-class MessageStore(private val config: SummaryConfig) {
+class MessageStore(
+    private val config: SummaryConfig,
+    private val mapper: ObjectMapper
+) {
 
     private val log = LoggerFactory.getLogger(MessageStore::class.java)
-    private val mapper = jacksonObjectMapper()
 
     private val messagesDir: File get() = File(config.dataDir, "messages")
     private val processedFile: File get() = File(config.dataDir, "processed.json")
-
-    // Persisted across digest runs for the lifetime of the process.
-    // Loaded from disk on first access.
-    private val processedIds: MutableSet<String> by lazy { loadProcessed() }
 
     fun loadMessages(
         fromTs: Long,
@@ -48,6 +46,7 @@ class MessageStore(private val config: SummaryConfig) {
             date = date.plusDays(1)
         }
 
+        val processedIds = loadProcessed()
         val filtered = result
             .filter { it.messageId !in processedIds }
             .filter { chatJids.isEmpty() || it.chatJid in chatJids }
@@ -62,9 +61,12 @@ class MessageStore(private val config: SummaryConfig) {
 
     fun markProcessed(ids: Collection<String>) {
         if (ids.isEmpty()) return
-        processedIds.addAll(ids)
-        saveProcessed()
-        log.info("Marked {} message(s) as processed (total: {})", ids.size, processedIds.size)
+        synchronized(this) {
+            val processedIds = loadProcessed()
+            processedIds.addAll(ids)
+            saveProcessed(processedIds)
+            log.info("Marked {} message(s) as processed (total: {})", ids.size, processedIds.size)
+        }
     }
 
     private fun parseFile(file: File, fromTs: Long, toTs: Long, chatLabels: Map<String, String>): List<WhatsappMessage> {
@@ -121,10 +123,10 @@ class MessageStore(private val config: SummaryConfig) {
         }
     }
 
-    private fun saveProcessed() {
+    private fun saveProcessed(ids: Set<String>) {
         try {
             processedFile.parentFile?.mkdirs()
-            val map = processedIds.associateWith { true }
+            val map = ids.associateWith { true }
             mapper.writeValue(processedFile, map)
         } catch (e: Exception) {
             log.error("Failed to write processed.json: {}", e.message)

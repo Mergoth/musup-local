@@ -46,9 +46,9 @@ open class DigestScheduler(
         val from = now.minusSeconds(config.digestWindowHours * 3600)
 
         val adminCfg = adminConfigReader.read()
-        val effectiveChatJids = adminCfg?.processorChatJids?.takeIf { it.isNotEmpty() } ?: config.chatJids
-        val effectiveTelegramIds = adminCfg?.telegramChatIds?.takeIf { it.isNotEmpty() } ?: config.telegramChatIds
-        val effectiveChatLabels = adminCfg?.chatLabels?.takeIf { it.isNotEmpty() } ?: config.chatLabels
+        val effectiveChatJids = if (adminCfg != null) adminCfg.processorChatJids else config.chatJids
+        val effectiveTelegramIds = if (adminCfg != null) adminCfg.telegramChatIds else config.telegramChatIds
+        val effectiveChatLabels = if (adminCfg != null) adminCfg.chatLabels else config.chatLabels
 
         log.info("Running digest: window [{}, {}], chats={}", from, now, effectiveChatJids.size)
 

@@ -6,18 +6,18 @@ import makeWASocket, {
 import P from "pino";
 import qrcode from "qrcode-terminal";
 import { rmSync } from "fs";
-import { config } from "./config.js";
-import { normalizeMessage } from "./normalize.js";
-import { appLogger } from "./appLogger.js";
+import { config } from "#src/config.js";
+import { normalizeMessage } from "#src/normalize.js";
+import { appLogger } from "#src/appLogger.js";
 import {
   initStore,
   getCachedChatName,
   registerChatName,
   appendMessage,
-} from "./store.js";
-import { setConnectionState, connectionEvents } from "./connectionState.js";
-import { watchAdminConfig, getAdminConfig } from "./adminConfig.js";
-import { startAdminServer } from "./adminServer.js";
+} from "#src/store.js";
+import { setConnectionState, connectionEvents } from "#src/connectionState.js";
+import { watchAdminConfig, getAdminConfig } from "#src/adminConfig.js";
+import { startAdminServer } from "#src/adminServer.js";
 
 startAdminServer(config.adminPort);
 
