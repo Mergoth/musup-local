@@ -4,8 +4,12 @@ services:
     restart: unless-stopped
     volumes:
       - /volume1/docker/musup/data:/data
+    env_file: .env
     environment:
       DATA_DIR: /data
+      ADMIN_PORT: "8081"
+    ports:
+      - "8081:8081"
 
   processor:
     image: musup-processor:latest
