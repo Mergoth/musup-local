@@ -72,8 +72,8 @@ remote_restart() {
 
 tail_logs() {
   local services="$*"
-  echo "==> Tailing logs (Ctrl-C to stop)..."
-  $SSH "${REMOTE_DOCKER} compose -f '${NAS_DIR}/docker-compose.yml' logs -f --tail=50 ${services}"
+  echo "==> Displaying last 50 lines of logs..."
+  $SSH "${REMOTE_DOCKER} compose -f '${NAS_DIR}/docker-compose.yml' logs --tail=50 ${services}"
 }
 
 # ---------------------------------------------------------------------------
