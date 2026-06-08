@@ -8,6 +8,7 @@ export interface AdminConfig {
   processorChatJids: string[];
   chatLabels: Record<string, string>;
   telegramChatIds: string[];
+  digestCron: string;
 }
 
 const configFile = path.join(config.dataDir, "config.json");
@@ -17,6 +18,7 @@ const defaults: AdminConfig = {
   processorChatJids: [...config.processorChatJids],
   chatLabels: { ...config.chatLabels },
   telegramChatIds: [...config.telegramChatIds],
+  digestCron: config.digestCron,
 };
 
 let cached: AdminConfig = { ...defaults };
@@ -43,8 +45,9 @@ function readFromDisk(): AdminConfig {
     typeof obj.chatLabels === "object" && obj.chatLabels !== null && !Array.isArray(obj.chatLabels)
       ? (obj.chatLabels as Record<string, string>)
       : defaults.chatLabels;
+  const digestCron = typeof obj.digestCron === "string" ? obj.digestCron : defaults.digestCron;
 
-  return { allowedChatJids, processorChatJids, telegramChatIds, chatLabels };
+  return { allowedChatJids, processorChatJids, telegramChatIds, chatLabels, digestCron };
 }
 
 export function loadAdminConfig(): AdminConfig {

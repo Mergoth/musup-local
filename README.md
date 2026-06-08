@@ -16,14 +16,15 @@ cp .env.example .env
 # fill in: LLM_API_KEY, LLM_API_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID_1
 ```
 
-**2. Groups & schedule** — edit `.env` or `processor/src/main/resources/application.yml`:
+**2. Groups & schedule** — edit `.env` or configure dynamically via the Admin UI:
 ```
 MUSUP_CHAT_JIDS=120363421703374121@g.us,…
 MUSUP_CHAT_LABELS_CSV=120363421703374121@g.us=Family
-MUSUP_DIGEST_CRON=0 0 6,19 * * ?   # UTC
+MUSUP_DIGEST_CRON=0 0 6,19 * * ?   # UTC (can also be managed via Admin UI)
 MUSUP_DIGEST_WINDOW_HOURS=13
 ```
 > To find a group JID: start the collector, send a message, check `data/chats.json`.
+> The digest schedule (cron) can be controlled directly inside the Admin UI and is hot-reloaded without container restarts.
 
 **3. Build & start** *(requires JDK 22+)*
 ```bash
@@ -48,7 +49,7 @@ bash deploy.sh processor   # or: all | collector
 ## Day-to-day
 
 ```bash
-# Trigger digest immediately
+# Trigger digest immediately (replace 8080 with PROCESSOR_PORT if changed)
 curl -X POST http://localhost:8080/jobs/whatsapp-summary
 
 # Rebuild after code changes

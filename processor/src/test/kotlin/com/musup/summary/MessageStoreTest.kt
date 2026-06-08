@@ -42,7 +42,7 @@ class MessageStoreTest {
         val messages = store.loadMessages(
             fromTs = 1780750000L,
             toTs = 1780770000L,
-            chatJids = emptyList() // All chats
+            chatJids = listOf("g1@g.us", "g2@g.us")
         )
 
         // Assert
@@ -88,7 +88,7 @@ class MessageStoreTest {
         val messages = store.loadMessages(
             fromTs = 1780750000L,
             toTs = 1780770000L,
-            chatJids = emptyList()
+            chatJids = listOf("g1@g.us", "g2@g.us")
         )
 
         assertEquals(1, messages.size)

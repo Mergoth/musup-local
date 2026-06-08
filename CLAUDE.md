@@ -41,7 +41,7 @@ collector (Baileys)
      │
      ▼
 processor (Micronaut / Kotlin)
-  • reads ndjson files on Quartz cron (default 06:00 & 19:00 UTC)
+  • reads ndjson files on Quartz cron (managed via Admin UI, defaults to 06:00 & 19:00 UTC)
   • filters by musup.chat-jids (can differ from collector allow-list)
   • builds a prompt and calls LLM API (Gemini, OpenAI-compat)
   • sends Telegram HTML summary to configured chat IDs
@@ -56,6 +56,8 @@ processor (Micronaut / Kotlin)
 |---|---|
 | `ALLOWED_CHAT_JIDS` | Comma-separated JIDs to forward; **empty = all chats** |
 | `DATA_DIR` | Shared volume path (default `/data`) |
+| `COLLECTOR_PORT` | Port for the Admin UI (default `8081`) |
+| `PROCESSOR_PORT` | Port for the Processor manual trigger (default `8080`) |
 
 ### Processor (`application.yml` or env overrides)
 
@@ -63,7 +65,7 @@ processor (Micronaut / Kotlin)
 |---|---|---|
 | `musup.chat-jids` | `MUSUP_CHAT_JIDS` | JIDs to include in digest |
 | `musup.chat-labels-csv` | `MUSUP_CHAT_LABELS_CSV` | `jid=Label` pairs |
-| `musup.digest-cron` | `MUSUP_DIGEST_CRON` | Quartz cron (UTC, 6 fields) |
+| `musup.digest-cron` | `MUSUP_DIGEST_CRON` | Quartz cron (UTC, 6 fields; overridden by config.json) |
 | `musup.digest-window-hours` | `MUSUP_DIGEST_WINDOW_HOURS` | Look-back window |
 | `musup.llm-api-key` | `LLM_API_KEY` | Gemini / OpenAI key |
 | `musup.telegram-bot-token` | `TELEGRAM_BOT_TOKEN` | Telegram bot token |
@@ -81,7 +83,7 @@ docker compose up -d
 # Scan WhatsApp QR (first run only)
 docker compose logs -f collector
 
-# Manual digest trigger
+# Manual digest trigger (replace 8080 with PROCESSOR_PORT if changed)
 curl -X POST http://localhost:8080/jobs/whatsapp-summary
 ```
 
@@ -105,7 +107,7 @@ Requires `deploy.local.sh` (git-ignored). Copy from `deploy.local.sh.example`.
 The NAS JVM takes ~90 seconds to start. Don't assume the processor is ready
 immediately after `docker compose up -d`. Poll the logs or wait before triggering.
 
-Manual digest trigger on NAS (after processor is up):
+Manual digest trigger on NAS (after processor is up, replace 8080 with PROCESSOR_PORT if changed):
 ```bash
 ssh -p <PORT> <USER>@<HOST> "curl -s -X POST http://localhost:8080/jobs/whatsapp-summary"
 ```

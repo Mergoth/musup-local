@@ -7,9 +7,10 @@ services:
     env_file: .env
     environment:
       DATA_DIR: /data
-      ADMIN_PORT: "8081"
+      ADMIN_PORT: "${COLLECTOR_PORT}"
     ports:
-      - "8081:8081"
+      - "${COLLECTOR_PORT}:${COLLECTOR_PORT}"
+
 
   processor:
     image: musup-processor:latest
@@ -20,4 +21,5 @@ services:
     environment:
       DATA_DIR: /data
     ports:
-      - "8080:8080"
+      - "${PROCESSOR_PORT}:8080"
+

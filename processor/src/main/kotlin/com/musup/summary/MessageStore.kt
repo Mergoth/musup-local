@@ -49,7 +49,7 @@ class MessageStore(
         val processedIds = loadProcessed()
         val filtered = result
             .filter { it.messageId !in processedIds }
-            .filter { chatJids.isEmpty() || it.chatJid in chatJids }
+            .filter { it.chatJid in chatJids }
             .sortedBy { it.timestamp }
 
         log.info(

@@ -4,14 +4,16 @@ services:
     restart: unless-stopped
     volumes:
       - ./data:/data
+    env_file: .env
     environment:
       DATA_DIR: /data
-      ADMIN_PORT: "8081"
+      ADMIN_PORT: "${COLLECTOR_PORT}"
       ADMIN_USER: "${ADMIN_USER:-admin}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
       ALLOWED_CHAT_JIDS: "${ALLOWED_CHAT_JIDS:-}"
     ports:
-      - "8081:8081"   # admin UI
+      - "${COLLECTOR_PORT}:${COLLECTOR_PORT}"   # admin UI
+
 
   processor:
     build: ./processor
@@ -22,4 +24,4 @@ services:
     environment:
       DATA_DIR: /data
     ports:
-      - "8080:8080"   # manual trigger endpoint
+      - "${PROCESSOR_PORT}:8080"   # manual trigger endpoint

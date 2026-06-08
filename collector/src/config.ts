@@ -32,6 +32,7 @@ export const config = {
       if (k && v) acc[k.trim()] = v.trim();
       return acc;
     }, {} as Record<string, string>),
+  digestCron: process.env.MUSUP_DIGEST_CRON || "0 0 6,17 * * ?",
   adminPort: parseInt(process.env.ADMIN_PORT || "8081", 10),
   adminUser: process.env.ADMIN_USER || "admin",
   adminPassword: process.env.ADMIN_PASSWORD || "",

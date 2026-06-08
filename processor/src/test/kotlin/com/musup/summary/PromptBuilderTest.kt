@@ -50,3 +50,5 @@ class PromptBuilderTest {
         assertTrue(prompt.contains("[2026-06-06T11:01:00Z] Я: Hi there"))
     }
 }
+
+

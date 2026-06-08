@@ -96,7 +96,7 @@ export function startAdminServer(adminPort: number): void {
       jid,
       name,
       collectorEnabled: cfg.allowedChatJids.length === 0 || cfg.allowedChatJids.includes(jid),
-      processorEnabled: cfg.processorChatJids.length === 0 || cfg.processorChatJids.includes(jid),
+      processorEnabled: cfg.processorChatJids.includes(jid),
     }));
     res.json(result);
   });
@@ -113,6 +113,7 @@ export function startAdminServer(adminPort: number): void {
       processorChatJids: isStringArray(body.processorChatJids) ? body.processorChatJids : current.processorChatJids,
       chatLabels: typeof body.chatLabels === "object" && body.chatLabels !== null && !Array.isArray(body.chatLabels) ? body.chatLabels : current.chatLabels,
       telegramChatIds: isStringArray(body.telegramChatIds) ? body.telegramChatIds : current.telegramChatIds,
+      digestCron: typeof body.digestCron === "string" ? body.digestCron : current.digestCron,
     });
     res.json({ ok: true });
   });
