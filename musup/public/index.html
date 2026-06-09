@@ -4,11 +4,29 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>musup admin</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <section id="auth-screen" class="auth-screen">
+      <form id="auth-form" class="auth-card">
+        <div class="brand auth-brand">
+          <span class="brand-mark">m</span>
+          <div>
+            <strong>musup</strong>
+            <small id="auth-subtitle">Admin access</small>
+          </div>
+        </div>
+        <h1 id="auth-title">Sign in</h1>
+        <label>
+          <span>Password</span>
+          <input id="auth-password" type="password" autocomplete="current-password" />
+        </label>
+        <button id="auth-submit" class="primary-button" type="submit">Continue</button>
+        <p id="auth-result" class="form-result"></p>
+      </form>
+    </section>
+
+    <div class="app-shell auth-hidden">
       <aside class="sidebar">
         <div class="brand">
           <span class="brand-mark">m</span>
@@ -23,6 +41,9 @@
           <button class="nav-item" data-view="summaries">Summaries</button>
           <button class="nav-item" data-view="monitor">Monitor</button>
         </nav>
+        <button id="logout-button" class="secondary-button logout-button" type="button">
+          Logout
+        </button>
       </aside>
 
       <main class="content">
@@ -78,6 +99,10 @@
                 <div class="metric-row">
                   <span>Groups / contacts</span>
                   <strong id="monitor-chat-types">0 / 0</strong>
+                </div>
+                <div class="metric-row">
+                  <span>Last backfill</span>
+                  <strong id="monitor-last-backfill">-</strong>
                 </div>
               </article>
             </aside>

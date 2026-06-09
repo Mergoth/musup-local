@@ -19,6 +19,8 @@ Data (auth session, messages, summaries, settings) is stored in `./data`. To mov
 
 Open the admin UI: **http://localhost:8787**
 
+On first open, musup asks you to set one local admin password. The UI and all non-health API endpoints are protected by an HttpOnly session cookie.
+
 ## Configuration
 
 ### 1. Link WhatsApp
@@ -29,7 +31,7 @@ Once connected the status changes to *open* and the app starts collecting messag
 
 ### 2. Pick chats to summarise
 
-Go to the **Chats** tab. New chats appear as messages arrive. Toggle **Subscribed** for each group or contact you want included in digests.
+Go to the **Chats** tab. New chats appear as messages arrive. Toggle **Subscribed** for each group or contact you want included in digests. Subscribed chats can request a best-effort WhatsApp history backfill once at least one message has been detected as an anchor.
 
 ### 3. Configure the LLM
 
@@ -62,19 +64,24 @@ You can trigger a digest immediately at any time from the Monitor tab or via the
 
 ## Prompt customisation
 
-The default prompt template lives in `collector/prompts/summary.md`. To customise it without losing the default, edit it through **Settings → Prompt** in the UI (stored in `data/prompts/summary.md`). Use `{{summaryLanguage}}` to inject the configured language.
+The shipped prompt template lives in `musup/prompts/summary.json`. To customise it without losing the default, edit it through **Settings → Prompt** in the UI (stored in `data/prompts/`). Use `{{summaryLanguage}}` to inject the configured language.
 
 ## API
 
-The same port exposes a REST API for scripting or home-automation integration.
+The same port exposes a REST API for scripting or home-automation integration. Except for `/health` and auth routes, API calls require the `musup_session` cookie.
 
 ```
 GET  /health                              # liveness probe
+GET  /api/auth/status                     # auth setup/login status
+POST /api/auth/setup                      # first-run password setup
+POST /api/auth/login                      # login and set session cookie
+POST /api/auth/logout                     # clear session cookie
 GET  /api/status                          # WhatsApp state, uptime, counters
 GET  /api/qr                              # current QR code as SVG (when not linked)
 
 GET  /api/chats                           # all detected chats + subscription state
 PUT  /api/chats/:jid/subscription         # {"subscribed": true/false}
+POST /api/chats/:jid/backfill             # best-effort WhatsApp history backfill
 
 GET  /api/settings                        # current settings (tokens redacted)
 PUT  /api/settings                        # update any settings field
@@ -98,10 +105,19 @@ POST /api/messages/purge                 # delete stored message logs
 POST /api/summaries/purge                # delete summary journal
 ```
 
+Example — login and store a cookie jar:
+
+```bash
+curl -c musup.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"your-admin-password"}' \
+  http://localhost:8787/api/auth/login
+```
+
 Example — subscribe a chat:
 
 ```bash
-curl -X PUT \
+curl -b musup.cookies -X PUT \
   -H 'Content-Type: application/json' \
   -d '{"subscribed": true}' \
   http://localhost:8787/api/chats/120363421703374121%40g.us/subscription
@@ -110,7 +126,7 @@ curl -X PUT \
 Example — trigger a digest:
 
 ```bash
-curl -X POST http://localhost:8787/jobs/whatsapp-summary
+curl -b musup.cookies -X POST http://localhost:8787/jobs/whatsapp-summary
 ```
 
 ## Day-to-day
@@ -129,7 +145,7 @@ docker compose down                   # stop
 | `data/messages/YYYY-MM-DD/HH.ndjson` | Raw message logs | 24 h |
 | `data/summaries/YYYY-MM-DD.ndjson` | Summary journal | 36 h |
 | `data/prompts/` | Custom prompt overrides | permanent |
-| `data/auth/` | WhatsApp session credentials | permanent |
+| `data/auth/` | WhatsApp session credentials. Cleared automatically when WhatsApp reports the session logged out so a fresh QR can be generated. | permanent until logout |
 
 ## Credits
 

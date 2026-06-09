@@ -49,6 +49,12 @@ export type MessageAnchor = {
   updatedAt: string;
 };
 
+export type AuthSession = {
+  tokenHash: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
 const dbFile = path.join(config.dataDir, "musup.db");
 let db: Database | undefined;
 
@@ -206,9 +212,16 @@ export async function initDatabase(): Promise<void> {
       updated_at text not null
     );
 
+    create table if not exists auth_sessions (
+      token_hash text primary key,
+      created_at text not null,
+      expires_at text not null
+    );
+
     create index if not exists idx_chats_subscribed on chats(subscribed);
     create index if not exists idx_events_ts on events(ts);
     create index if not exists idx_message_anchors_timestamp on message_anchors(timestamp);
+    create index if not exists idx_auth_sessions_expires_at on auth_sessions(expires_at);
   `);
 
   const shouldResetScheduleForTimezone = !hasSetting("digestTimezone");
@@ -303,6 +316,53 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
 
   saveDb();
   return getSettings();
+}
+
+export function hasAdminPassword(): boolean {
+  return Boolean(getSetting("adminPasswordHash"));
+}
+
+export function getAdminPasswordHash(): string | undefined {
+  return getSetting("adminPasswordHash");
+}
+
+export function setAdminPasswordHash(passwordHash: string): void {
+  setSettingValue("adminPasswordHash", passwordHash);
+  saveDb();
+}
+
+export function createAuthSession(tokenHash: string, expiresAt: string): AuthSession {
+  const createdAt = new Date().toISOString();
+  getDb().run(
+    "insert into auth_sessions (token_hash, created_at, expires_at) values (?, ?, ?)",
+    [tokenHash, createdAt, expiresAt]
+  );
+  saveDb();
+  return { tokenHash, createdAt, expiresAt };
+}
+
+export function getAuthSession(tokenHash: string): AuthSession | undefined {
+  const row = firstRow(
+    "select token_hash, created_at, expires_at from auth_sessions where token_hash = ?",
+    [tokenHash]
+  );
+  if (!row) return undefined;
+
+  return {
+    tokenHash: String(row.token_hash || ""),
+    createdAt: String(row.created_at || ""),
+    expiresAt: String(row.expires_at || ""),
+  };
+}
+
+export function deleteAuthSession(tokenHash: string): void {
+  getDb().run("delete from auth_sessions where token_hash = ?", [tokenHash]);
+  saveDb();
+}
+
+export function deleteExpiredAuthSessions(): void {
+  getDb().run("delete from auth_sessions where expires_at <= ?", [new Date().toISOString()]);
+  saveDb();
 }
 
 export function validateWhatsappDeliveryTarget(jid: string): void {

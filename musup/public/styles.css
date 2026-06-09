@@ -44,6 +44,44 @@ textarea {
   min-height: 100vh;
 }
 
+.app-shell.auth-hidden {
+  display: none;
+}
+
+.auth-screen {
+  display: none;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-screen.active {
+  display: grid;
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(251, 250, 246, 0.94);
+  box-shadow: var(--shadow);
+}
+
+.auth-brand {
+  margin-bottom: 20px;
+}
+
+.auth-card h1 {
+  margin-bottom: 16px;
+}
+
+.auth-card .primary-button {
+  width: 100%;
+  height: var(--control-height);
+  margin-top: 14px;
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -84,6 +122,13 @@ label small {
 .nav {
   display: grid;
   gap: 8px;
+}
+
+.logout-button {
+  width: 100%;
+  height: var(--control-height);
+  margin-top: 18px;
+  text-align: center;
 }
 
 .nav-item,

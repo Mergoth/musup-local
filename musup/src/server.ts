@@ -1,6 +1,17 @@
 import http from "http";
 import fs from "fs";
 import path from "path";
+import {
+  AUTH_COOKIE_NAME,
+  createSessionToken,
+  deleteSessionToken,
+  getClearSessionCookie,
+  getCookieValue,
+  getSessionCookie,
+  hashPassword,
+  isValidSessionToken,
+  verifyPassword,
+} from "./auth.js";
 import { config } from "./config.js";
 import { appLogger } from "./appLogger.js";
 import { runDigest } from "./digest/digestService.js";
@@ -15,7 +26,7 @@ import {
   updatePromptTemplate,
 } from "./digest/promptTemplates.js";
 import { listSummaries, purgeOldSummaries } from "./digest/summaryStore.js";
-import { requestChatBackfill } from "./whatsappBackfill.js";
+import { listBackfillRequests, requestChatBackfill } from "./whatsappBackfill.js";
 import { testWhatsappDelivery } from "./whatsappDelivery.js";
 import { refreshDigestScheduler } from "./digest/scheduler.js";
 import { testLlmConnection, type LlmConnectionConfig } from "./digest/llmClient.js";
@@ -25,9 +36,12 @@ import {
 } from "./digest/telegramClient.js";
 import {
   getSettings,
+  getAdminPasswordHash,
+  hasAdminPassword,
   listChats,
   listEvents,
   recordEvent,
+  setAdminPasswordHash,
   setChatSubscribed,
   updateSettings,
   validateWhatsappDeliveryTarget,
@@ -48,10 +62,12 @@ const contentTypes: Record<string, string> = {
 function sendJson(
   res: http.ServerResponse,
   statusCode: number,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  headers: http.OutgoingHttpHeaders = {}
 ): void {
   const json = JSON.stringify(body);
   res.writeHead(statusCode, {
+    ...headers,
     "Content-Type": "application/json",
     "Content-Length": Buffer.byteLength(json),
   });
@@ -159,8 +175,26 @@ function cleanTelegramTestConfig(input: unknown): TelegramConnectionConfig {
   };
 }
 
+function cleanPassword(input: unknown): string {
+  if (!input || typeof input !== "object") return "";
+  const password = (input as { password?: unknown }).password;
+  return typeof password === "string" ? password : "";
+}
+
 function getUrl(req: http.IncomingMessage): URL {
   return new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+}
+
+function getRequestSessionToken(req: http.IncomingMessage): string | undefined {
+  return getCookieValue(req.headers.cookie, AUTH_COOKIE_NAME);
+}
+
+function isAuthenticated(req: http.IncomingMessage): boolean {
+  return isValidSessionToken(getRequestSessionToken(req));
+}
+
+function isProtectedPath(pathname: string): boolean {
+  return pathname.startsWith("/api/") || pathname.startsWith("/jobs/");
 }
 
 function sendFile(res: http.ServerResponse, filePath: string): void {
@@ -190,6 +224,81 @@ function tryServeStatic(url: URL, res: http.ServerResponse): boolean {
 export function startServer(): http.Server {
   const server = http.createServer(async (req, res) => {
     const url = getUrl(req);
+
+    if (req.method === "GET" && url.pathname === "/health") {
+      sendJson(res, 200, { status: "ok" });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/auth/status") {
+      sendJson(res, 200, {
+        configured: hasAdminPassword(),
+        authenticated: isAuthenticated(req),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/auth/setup") {
+      if (hasAdminPassword()) {
+        sendJson(res, 409, { status: "error", error: "Admin password is already set" });
+        return;
+      }
+
+      const password = cleanPassword(await readJsonBody(req));
+      if (password.length < 8) {
+        sendJson(res, 400, {
+          status: "error",
+          error: "Password must be at least 8 characters",
+        });
+        return;
+      }
+
+      setAdminPasswordHash(await hashPassword(password));
+      const session = createSessionToken();
+      recordEvent("info", "auth.setup", "Admin password configured");
+      sendJson(
+        res,
+        200,
+        { status: "ok" },
+        { "Set-Cookie": getSessionCookie(session.token, session.expiresAt) }
+      );
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/auth/login") {
+      const storedHash = getAdminPasswordHash();
+      const password = cleanPassword(await readJsonBody(req));
+      if (!storedHash || !(await verifyPassword(password, storedHash))) {
+        sendJson(res, 401, { status: "unauthorized", error: "Invalid password" });
+        return;
+      }
+
+      const session = createSessionToken();
+      recordEvent("info", "auth.login", "Admin logged in");
+      sendJson(
+        res,
+        200,
+        { status: "ok" },
+        { "Set-Cookie": getSessionCookie(session.token, session.expiresAt) }
+      );
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/auth/logout") {
+      deleteSessionToken(getRequestSessionToken(req));
+      sendJson(
+        res,
+        200,
+        { status: "ok" },
+        { "Set-Cookie": getClearSessionCookie() }
+      );
+      return;
+    }
+
+    if (isProtectedPath(url.pathname) && !isAuthenticated(req)) {
+      sendJson(res, 401, { status: "unauthorized", error: "Authentication required" });
+      return;
+    }
 
     if (req.method === "POST" && url.pathname === "/jobs/whatsapp-summary") {
       appLogger.info("Manual digest trigger via HTTP");
@@ -227,11 +336,6 @@ export function startServer(): http.Server {
       return;
     }
 
-    if (req.method === "GET" && url.pathname === "/health") {
-      sendJson(res, 200, { status: "ok" });
-      return;
-    }
-
     if (req.method === "GET" && url.pathname === "/api/status") {
       const settings = getSettings();
       const runtime = getRuntimeState();
@@ -250,6 +354,7 @@ export function startServer(): http.Server {
           groups: chats.filter((chat) => chat.type === "group").length,
           contacts: chats.filter((chat) => chat.type === "contact").length,
         },
+        backfills: listBackfillRequests().slice(0, 10),
       });
       return;
     }
@@ -432,8 +537,6 @@ export function startServer(): http.Server {
       return;
     }
 
-    // Dormant endpoint: kept for local experiments, but intentionally not linked
-    // from the admin UI while WhatsApp history backfill is unreliable.
     const backfillMatch = url.pathname.match(/^\/api\/chats\/([^/]+)\/backfill$/);
     if (req.method === "POST" && backfillMatch) {
       try {

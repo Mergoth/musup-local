@@ -6,6 +6,10 @@ const state = {
   summaries: [],
   promptTemplate: null,
   promptVersions: [],
+  auth: {
+    configured: false,
+    authenticated: false,
+  },
   view: "monitor",
   chatScope: "all",
   summaryScope: "all",
@@ -19,15 +23,70 @@ const views = new Set(["whatsapp", "config", "summaries", "monitor"]);
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    credentials: "same-origin",
     ...options,
   });
 
   if (!response.ok) {
     const text = await response.text();
+    if (response.status === 401) {
+      state.auth.authenticated = false;
+      showAuthScreen();
+    }
     throw new Error(text || `Request failed: ${response.status}`);
   }
 
   return response.json();
+}
+
+async function authApi(path, options = {}) {
+  const response = await fetch(path, {
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    credentials: "same-origin",
+    ...options,
+  });
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : {};
+  if (!response.ok) {
+    throw new Error(body.error || text || `Request failed: ${response.status}`);
+  }
+  return body;
+}
+
+function setAppAuthenticated(authenticated) {
+  state.auth.authenticated = authenticated;
+  $(".app-shell").classList.toggle("auth-hidden", !authenticated);
+  $("#auth-screen").classList.toggle("active", !authenticated);
+}
+
+function showAuthScreen() {
+  const setupMode = !state.auth.configured;
+  $("#auth-title").textContent = setupMode ? "Set admin password" : "Sign in";
+  $("#auth-subtitle").textContent = setupMode
+    ? "Create the local admin password"
+    : "Admin access";
+  $("#auth-submit").textContent = setupMode ? "Set password" : "Continue";
+  $("#auth-password").autocomplete = setupMode ? "new-password" : "current-password";
+  $("#auth-password").value = "";
+  $("#auth-result").textContent = "";
+  setAppAuthenticated(false);
+  $("#auth-password").focus();
+}
+
+async function initAuth() {
+  const auth = await authApi("/api/auth/status");
+  state.auth = {
+    configured: Boolean(auth.configured),
+    authenticated: Boolean(auth.authenticated),
+  };
+
+  if (!state.auth.authenticated) {
+    showAuthScreen();
+    return false;
+  }
+
+  setAppAuthenticated(true);
+  return true;
 }
 
 function getViewFromHash() {
@@ -101,6 +160,10 @@ function renderStatus() {
   $("#monitor-chat-subscribed").textContent = chatStats.subscribed ?? 0;
   $("#monitor-chat-types").textContent =
     `${chatStats.groups ?? 0} / ${chatStats.contacts ?? 0}`;
+  const latestBackfill = state.status?.backfills?.[0];
+  $("#monitor-last-backfill").textContent = latestBackfill
+    ? `${latestBackfill.status} · ${latestBackfill.savedMessages ?? 0}/${latestBackfill.receivedMessages ?? 0}`
+    : "-";
 
   $(".qr-panel").classList.toggle("connected", connection === "open");
   const qrBox = $("#qr-box");
@@ -331,6 +394,11 @@ function renderChats() {
         </div>
       </div>
       <div class="chat-actions">
+        ${
+          chat.subscribed
+            ? `<button class="secondary-button compact-button" type="button" data-backfill-jid="${escapeHtml(chat.jid)}">Backfill</button>`
+            : ""
+        }
         <label class="switch-row chat-switch">
           <input type="checkbox" ${chat.subscribed ? "checked" : ""} data-jid="${escapeHtml(chat.jid)}" />
         </label>
@@ -1074,13 +1142,77 @@ $("#chats-list").addEventListener("change", async (event) => {
   await refreshAll();
 });
 
-setView(getViewFromHash(), false);
-refreshAll().catch((err) => {
+$("#chats-list").addEventListener("click", async (event) => {
+  const button = event.target;
+  if (!(button instanceof HTMLButtonElement)) return;
+  const jid = button.dataset.backfillJid;
+  if (!jid) return;
+
+  button.disabled = true;
+  button.textContent = "Asked";
+  try {
+    const result = await api(`/api/chats/${encodeURIComponent(jid)}/backfill`, {
+      method: "POST",
+      body: JSON.stringify({ count: 50 }),
+    });
+    $("#digest-output").textContent = JSON.stringify(result, null, 2);
+    await refreshAll();
+  } catch (err) {
+    button.textContent = "Failed";
+    $("#digest-output").textContent = err instanceof Error ? err.message : String(err);
+    await refreshAll();
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#auth-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#auth-submit");
+  const result = $("#auth-result");
+  const password = $("#auth-password").value;
+  const endpoint = state.auth.configured ? "/api/auth/login" : "/api/auth/setup";
+
+  button.disabled = true;
+  result.className = "form-result";
+  result.textContent = state.auth.configured ? "Signing in..." : "Saving...";
+
+  try {
+    await authApi(endpoint, {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    });
+    state.auth.configured = true;
+    setAppAuthenticated(true);
+    setView(getViewFromHash(), false);
+    await refreshAll();
+  } catch (err) {
+    result.className = "form-result error-text";
+    result.textContent = err instanceof Error ? err.message : String(err);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#logout-button").addEventListener("click", async () => {
+  await authApi("/api/auth/logout", { method: "POST" });
+  state.auth.configured = true;
+  showAuthScreen();
+});
+
+async function boot() {
+  setView(getViewFromHash(), false);
+  if (!(await initAuth())) return;
+  await refreshAll();
+}
+
+boot().catch((err) => {
   $("#events-list").innerHTML =
     `<div class="empty-state">${escapeHtml(err.message)}</div>`;
 });
 
 setInterval(() => {
+  if (!state.auth.authenticated) return;
   if (state.view === "monitor" || state.view === "whatsapp") {
     refreshAll().catch(() => {});
   }

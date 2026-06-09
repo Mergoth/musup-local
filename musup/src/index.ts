@@ -4,6 +4,7 @@ import makeWASocket, {
   proto,
   useMultiFileAuthState,
 } from "@whiskeysockets/baileys";
+import fs from "fs";
 import P from "pino";
 import { config } from "./config.js";
 import { normalizeMessage } from "./normalize.js";
@@ -29,9 +30,10 @@ import {
 } from "./db/database.js";
 import {
   incrementCounter,
+  getRuntimeState,
   setWhatsappState,
 } from "./runtimeState.js";
-import { configureBackfillHandler } from "./whatsappBackfill.js";
+import { configureBackfillHandler, recordBackfillHistory } from "./whatsappBackfill.js";
 import { configureWhatsappDeliveryHandler } from "./whatsappDelivery.js";
 import type { NormalizedMessage } from "./normalize.js";
 
@@ -51,6 +53,10 @@ function jidToReadableId(jid: string): string {
     .replace("@s.whatsapp.net", "")
     .replace("@g.us", "")
     .replace("@lid", "");
+}
+
+function clearWhatsappAuth(): void {
+  fs.rmSync(config.authDir, { recursive: true, force: true });
 }
 
 async function resolveChatName(
@@ -166,9 +172,15 @@ async function startCollector() {
   });
 
   configureBackfillHandler(async (jid, count) => {
+    if (getRuntimeState().whatsapp.connection !== "open") {
+      throw new Error("WhatsApp must be connected before requesting backfill");
+    }
+
     const anchor = getMessageAnchor(jid) || getLatestMessageForChat(jid);
     if (!anchor) {
-      throw new Error("Backfill needs at least one detected message from this chat as an anchor");
+      throw new Error(
+        "Backfill needs at least one detected message from this chat as an anchor. Wait for any new message in the chat, then try again."
+      );
     }
 
     const requestId = await sock.fetchMessageHistory(
@@ -197,6 +209,7 @@ async function startCollector() {
       requestId,
       anchorMessageId: anchor.messageId,
       anchorTimestamp: anchor.timestamp,
+      requestedAt: new Date().toISOString(),
     };
   });
 
@@ -243,9 +256,15 @@ async function startCollector() {
           });
         }, 5000);
       } else {
-        appLogger.error("Logged out. Delete auth folder and scan QR again.");
+        appLogger.error("Logged out. Clearing WhatsApp auth and requesting a new QR.");
         recordEvent("error", "whatsapp.logged_out", "WhatsApp logged out");
-        process.exit(1);
+        clearWhatsappAuth();
+        setWhatsappState("starting", { qr: null, statusCode });
+        setTimeout(() => {
+          startCollector().catch((err) => {
+            appLogger.error("Failed to restart collector after logout", err);
+          });
+        }, 1000);
       }
     }
   });
@@ -267,7 +286,7 @@ async function startCollector() {
     }
   });
 
-  sock.ev.on("messaging-history.set", async ({ messages }) => {
+  sock.ev.on("messaging-history.set", async ({ messages, syncType, peerDataRequestSessionId }) => {
     let saved = 0;
 
     for (const message of messages) {
@@ -283,10 +302,14 @@ async function startCollector() {
       if (await saveNormalizedMessage(normalized, chatName, "history")) saved += 1;
     }
 
-    if (messages.length > 0) {
+    const backfill = recordBackfillHistory(peerDataRequestSessionId, messages.length, saved);
+    if (messages.length > 0 || backfill) {
       recordEvent("info", "backfill.history_received", "WhatsApp history messages received", {
         received: messages.length,
         saved,
+        syncType,
+        requestId: peerDataRequestSessionId,
+        jid: backfill?.jid,
       });
     }
   });
