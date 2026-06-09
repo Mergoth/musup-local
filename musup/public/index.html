@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>musup admin</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">m</span>
+          <div>
+            <strong>musup</strong>
+            <small>WhatsApp digest control</small>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-item active" data-view="whatsapp">Whatsapp</button>
+          <button class="nav-item" data-view="config">Config</button>
+          <button class="nav-item" data-view="summaries">Summaries</button>
+          <button class="nav-item" data-view="monitor">Monitor</button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <h1 id="page-title">Whatsapp</h1>
+          </div>
+        </header>
+
+        <section class="view active" id="view-whatsapp">
+          <div class="whatsapp-grid">
+            <article class="panel chats-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Detected chats and contacts</h2>
+                </div>
+                <input id="chat-filter" class="search-input" type="search" placeholder="Filter" />
+              </div>
+              <div class="chat-toolbar">
+                <div class="segmented-control" aria-label="Chat filter">
+                  <button class="segment active" type="button" data-chat-scope="all">All</button>
+                  <button class="segment" type="button" data-chat-scope="subscribed">Subscribed</button>
+                  <button class="segment" type="button" data-chat-scope="groups">Groups</button>
+                  <button class="segment" type="button" data-chat-scope="contacts">Contacts</button>
+                </div>
+              </div>
+              <div id="chats-list" class="chats-list"></div>
+            </article>
+
+            <aside class="whatsapp-side">
+              <article class="panel qr-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2 id="connection-label">Starting</h2>
+                  </div>
+                  <span id="connection-pill" class="pill neutral">checking</span>
+                </div>
+                <div id="qr-box" class="qr-box">
+                  <div class="empty-state">QR code will appear here when WhatsApp needs login.</div>
+                </div>
+              </article>
+
+              <article class="panel">
+                <h2>Statistics</h2>
+                <div class="metric-row">
+                  <span>Total detected</span>
+                  <strong id="monitor-chat-total">0</strong>
+                </div>
+                <div class="metric-row">
+                  <span>Subscribed</span>
+                  <strong id="monitor-chat-subscribed">0</strong>
+                </div>
+                <div class="metric-row">
+                  <span>Groups / contacts</span>
+                  <strong id="monitor-chat-types">0 / 0</strong>
+                </div>
+              </article>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="view-summaries">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Journal</p>
+                <h2>Generated summaries</h2>
+              </div>
+            </div>
+            <div class="chat-toolbar">
+              <div class="segmented-control" aria-label="Summary filter">
+                <button class="segment active" type="button" data-summary-scope="all">All</button>
+                <button class="segment" type="button" data-summary-scope="text">With text</button>
+                <button class="segment" type="button" data-summary-scope="empty">Empty</button>
+                <button class="segment" type="button" data-summary-scope="errors">Errors</button>
+              </div>
+            </div>
+            <div id="summaries-list" class="summaries-list"></div>
+          </article>
+        </section>
+
+        <section class="view" id="view-config">
+          <section class="config-section">
+            <div class="section-heading">
+              <h2>Summary generation</h2>
+            </div>
+            <div class="settings-grid two-column">
+              <article class="panel">
+                <label class="switch-row">
+                  <span>
+                    <strong>Enable summaries</strong>
+                    <small>Generate summaries with the configured LLM.</small>
+                  </span>
+                  <input id="summarization-enabled" type="checkbox" />
+                </label>
+                <div class="digest-schedule-row">
+                  <div class="schedule-picker">
+                    <label class="setting-row">
+                      <span>Time</span>
+                      <input id="schedule-time-input" type="time" value="10:00" />
+                    </label>
+                    <button id="add-schedule-time-button" class="secondary-button" type="button">
+                      Add
+                    </button>
+                  </div>
+                  <div id="schedule-times-list" class="schedule-times-list"></div>
+                  <p id="schedule-preview" class="muted"></p>
+                </div>
+                <div class="digest-language-row">
+                  <label class="setting-row">
+                    <span>Language</span>
+                    <input id="summary-language" name="summaryLanguage" type="text" />
+                  </label>
+                  <button id="save-digest-button" class="primary-button save-button" type="button">Save</button>
+                </div>
+                <p id="digest-settings-result" class="form-result"></p>
+              </article>
+
+              <article class="panel">
+                <label class="switch-row static-row">
+                  <span>
+                    <strong>Model settings</strong>
+                    <small>Configure the model used to generate summaries.</small>
+                  </span>
+                  <span class="switch-spacer" aria-hidden="true"></span>
+                </label>
+                <p id="settings-readiness" class="muted">Configure required fields before enabling summaries.</p>
+                <label class="setting-row">
+                  <span>API URL</span>
+                  <input id="llm-api-url" name="llmApiUrl" type="url" />
+                </label>
+                <label class="setting-row">
+                  <span>Model</span>
+                  <input id="llm-model" name="llmModel" type="text" />
+                </label>
+                <label class="setting-row">
+                  <span>API key</span>
+                  <input id="llm-api-key" name="llmApiKey" type="password" autocomplete="off" />
+                </label>
+                <div class="form-actions">
+                  <button id="test-llm-button" class="secondary-button" type="button">
+                    Test
+                  </button>
+                  <button id="save-llm-button" class="primary-button save-button" type="button">Save</button>
+                </div>
+                <p id="llm-test-result" class="form-result"></p>
+              </article>
+            </div>
+          </section>
+
+          <section class="config-section">
+            <div class="section-heading">
+              <h2>Summary destinations</h2>
+            </div>
+            <div class="settings-grid two-column">
+              <article class="panel">
+                <label class="switch-row">
+                  <span>
+                    <strong>WhatsApp delivery</strong>
+                    <small>Send generated summaries to one known chat.</small>
+                  </span>
+                  <input id="whatsapp-delivery-enabled" type="checkbox" />
+                </label>
+                <label class="setting-row">
+                  <span>Target chat</span>
+                  <select id="whatsapp-delivery-chat"></select>
+                </label>
+                <p id="whatsapp-delivery-hint" class="muted"></p>
+                <div class="form-actions">
+                  <button id="test-whatsapp-button" class="secondary-button" type="button">
+                    Test
+                  </button>
+                  <button id="save-whatsapp-button" class="primary-button save-button" type="button">
+                    Save
+                  </button>
+                </div>
+                <p id="whatsapp-test-result" class="form-result"></p>
+              </article>
+
+              <article class="panel">
+                <label class="switch-row">
+                  <span>
+                    <strong>Telegram delivery</strong>
+                    <small>Send generated summaries to Telegram.</small>
+                  </span>
+                  <input id="telegram-enabled" type="checkbox" />
+                </label>
+                <label class="setting-row">
+                  <span>Bot token</span>
+                  <input id="telegram-bot-token" name="telegramBotToken" type="password" />
+                </label>
+                <label class="setting-row">
+                  <span>Chat IDs</span>
+                  <input id="telegram-chat-ids" name="telegramChatIds" type="text" />
+                </label>
+                <div class="form-actions">
+                  <button id="test-telegram-button" class="secondary-button" type="button">
+                    Test
+                  </button>
+                  <button id="save-telegram-button" class="primary-button save-button" type="button">
+                    Save
+                  </button>
+                </div>
+                <p id="telegram-test-result" class="form-result"></p>
+              </article>
+            </div>
+          </section>
+
+          <section class="config-section">
+            <details class="prompt-details">
+              <summary>
+                <span>
+                  <strong>Summary prompt template</strong>
+                </span>
+              </summary>
+              <article class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Summary template</h2>
+                  </div>
+                  <div class="form-actions inline-actions">
+                    <button id="reset-prompt-button" class="secondary-button" type="button">
+                      Reset defaults
+                    </button>
+                    <button id="save-prompt-button" class="primary-button save-button" type="button">Save</button>
+                  </div>
+                </div>
+                <p id="prompt-meta" class="muted"></p>
+                <div class="prompt-toolbar">
+                  <label>
+                    Version
+                    <select id="prompt-version-select"></select>
+                  </label>
+                  <button id="prune-prompts-button" class="secondary-button" type="button">
+                    Delete all but 10 most recent prompts
+                  </button>
+                </div>
+                <div class="prompt-grid">
+                  <label>
+                    Instructions
+                    <textarea id="prompt-instructions" rows="12"></textarea>
+                  </label>
+                  <label>
+                    Output format
+                    <textarea id="prompt-output-format" rows="12"></textarea>
+                  </label>
+                  <label>
+                    Per-chat template
+                    <textarea id="prompt-per-chat-template" rows="12"></textarea>
+                  </label>
+                  <label>
+                    Transcript intro
+                    <textarea id="prompt-transcript-intro" rows="5"></textarea>
+                  </label>
+                </div>
+                <p id="prompt-result" class="form-result"></p>
+              </article>
+            </details>
+          </section>
+        </section>
+
+        <section class="view" id="view-monitor">
+          <div class="status-grid">
+            <article class="panel">
+              <p class="eyebrow">Ingestion</p>
+              <div class="metric-row">
+                <span>Detected chats</span>
+                <strong id="metric-detected">0</strong>
+              </div>
+              <div class="metric-row">
+                <span>Saved messages</span>
+                <strong id="metric-saved">0</strong>
+              </div>
+              <div class="metric-row">
+                <span>Skipped messages</span>
+                <strong id="metric-skipped">0</strong>
+              </div>
+              <div class="metric-row">
+                <span>Last saved</span>
+                <strong id="metric-last-saved">-</strong>
+              </div>
+            </article>
+
+            <article class="panel">
+              <p class="eyebrow">Digest</p>
+              <h2 id="summary-label">Disabled</h2>
+              <div class="metric-row">
+                <span>Last status</span>
+                <strong id="digest-status">Never</strong>
+              </div>
+              <div class="metric-row">
+                <span>Next run</span>
+                <strong id="digest-next-run">-</strong>
+              </div>
+              <div class="metric-row">
+                <span>Duration</span>
+                <strong id="digest-duration">-</strong>
+              </div>
+              <p id="digest-reason" class="muted">Summarization runs only when enabled and configured.</p>
+              <div class="digest-monitor-actions">
+                <button id="mark-unprocessed-button" class="secondary-button" type="button">
+                  Mark unprocessed
+                </button>
+                <button id="trigger-digest-button" class="primary-button" type="button">
+                  Test trigger
+                </button>
+              </div>
+              <pre id="digest-output" class="compact-output"></pre>
+            </article>
+
+            <article class="panel">
+              <p class="eyebrow">App</p>
+              <div class="metric-row">
+                <span>Uptime</span>
+                <strong id="app-uptime">-</strong>
+              </div>
+              <div class="metric-row">
+                <span>Started</span>
+                <strong id="app-started">-</strong>
+              </div>
+              <div class="metric-row">
+                <span>WhatsApp changed</span>
+                <strong id="whatsapp-changed">-</strong>
+              </div>
+            </article>
+          </div>
+
+          <article class="panel events-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Activity</p>
+                <h2>Recent events</h2>
+              </div>
+            </div>
+            <div id="events-list" class="events-list"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

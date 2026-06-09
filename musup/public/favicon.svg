@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- rounded square background -->
+  <rect width="32" height="32" rx="7" fill="#111827"/>
+  <!-- speech bubble -->
+  <path d="M5 7.5C5 5.6 6.6 4 8.5 4h15C25.4 4 27 5.6 27 7.5v11c0 1.9-1.6 3.5-3.5 3.5H14l-5 5v-5H8.5C6.6 22 5 20.4 5 18.5z" fill="#25d366"/>
+  <!-- digest lines -->
+  <line x1="9.5" y1="10" x2="22.5" y2="10" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="9.5" y1="13.5" x2="22.5" y2="13.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="9.5" y1="17" x2="17" y2="17" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
