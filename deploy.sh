@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Deploy musup to the NAS: build the image locally, ship it via docker save/load,
-# sync compose + .env, restart. NAS settings live in deploy.local.sh (git-ignored).
+# Deploy musup to a VM (Oracle Cloud Always Free ARM by default).
+#   ./deploy.sh setup   one-time: install Docker on a fresh Ubuntu VM
+#   ./deploy.sh         build image, ship it, restart
+#   ./deploy.sh tunnel  open the admin UI at http://localhost:8787
+#   ./deploy.sh logs    last 100 log lines
+# Host settings live in deploy.local.sh (git-ignored).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -13,33 +17,58 @@ if [[ ! -f "$LOCAL_CONFIG" ]]; then
 fi
 source "$LOCAL_CONFIG"
 
-: "${NAS_USER:?deploy.local.sh must set NAS_USER}"
-: "${NAS_HOST:?deploy.local.sh must set NAS_HOST}"
-: "${NAS_PORT:?deploy.local.sh must set NAS_PORT}"
-: "${NAS_DIR:?deploy.local.sh must set NAS_DIR}"
-: "${REMOTE_DOCKER:?deploy.local.sh must set REMOTE_DOCKER}"
+: "${DEPLOY_USER:?deploy.local.sh must set DEPLOY_USER}"
+: "${DEPLOY_HOST:?deploy.local.sh must set DEPLOY_HOST}"
+DEPLOY_PORT="${DEPLOY_PORT:-22}"
+DEPLOY_DIR="${DEPLOY_DIR:-/home/${DEPLOY_USER}/musup}"
+DEPLOY_PLATFORM="${DEPLOY_PLATFORM:-linux/arm64}"
+APP_PORT="${APP_PORT:-8787}"
 
-SSH="ssh -p ${NAS_PORT} ${NAS_USER}@${NAS_HOST}"
-SCP="scp -O -P ${NAS_PORT}"
+SSH_OPTS=(-p "${DEPLOY_PORT}")
+[[ -n "${SSH_KEY:-}" ]] && SSH_OPTS+=(-i "${SSH_KEY}")
+TARGET="${DEPLOY_USER}@${DEPLOY_HOST}"
+remote() { ssh "${SSH_OPTS[@]}" "$TARGET" "$@"; }
+upload() { scp -P "${DEPLOY_PORT}" ${SSH_KEY:+-i "$SSH_KEY"} "$1" "${TARGET}:$2"; }
 
-echo "==> Building image musup:latest..."
-docker build --platform linux/amd64 -t musup:latest "${SCRIPT_DIR}/musup"
+case "${1:-deploy}" in
+  setup)
+    echo "==> Installing Docker on ${DEPLOY_HOST}..."
+    remote "set -e
+      sudo apt-get update -q
+      sudo apt-get install -y -q docker.io docker-compose-v2
+      sudo usermod -aG docker \$USER
+      mkdir -p '${DEPLOY_DIR}/data'"
+    echo "Done. Run ./deploy.sh to deploy."
+    ;;
+  deploy)
+    echo "==> Building musup:latest for ${DEPLOY_PLATFORM}..."
+    docker build --platform "${DEPLOY_PLATFORM}" -t musup:latest "${SCRIPT_DIR}/musup"
 
-echo "==> Shipping image to NAS..."
-docker save musup:latest | gzip | $SSH "gzip -d | ${REMOTE_DOCKER} load"
+    echo "==> Shipping image..."
+    docker save musup:latest | gzip | remote "gzip -d | docker load"
 
-echo "==> Syncing compose file and .env..."
-$SCP "${SCRIPT_DIR}/compose.nas.yml" "${NAS_USER}@${NAS_HOST}:${NAS_DIR}/docker-compose.yml"
-if [[ -f "${SCRIPT_DIR}/.env" ]]; then
-  $SCP "${SCRIPT_DIR}/.env" "${NAS_USER}@${NAS_HOST}:${NAS_DIR}/.env"
-else
-  $SSH "touch '${NAS_DIR}/.env'"
-fi
+    echo "==> Syncing compose file and .env..."
+    remote "mkdir -p '${DEPLOY_DIR}/data'"
+    upload "${SCRIPT_DIR}/compose.prod.yml" "${DEPLOY_DIR}/compose.yml"
+    if [[ -f "${SCRIPT_DIR}/.env" ]]; then
+      upload "${SCRIPT_DIR}/.env" "${DEPLOY_DIR}/.env"
+    else
+      remote "touch '${DEPLOY_DIR}/.env'"
+    fi
 
-# --remove-orphans stops the old collector/processor containers, which would
-# otherwise share the WhatsApp session with the new app.
-echo "==> Restarting on NAS..."
-$SSH "cd '${NAS_DIR}' && ${REMOTE_DOCKER} compose up -d --remove-orphans"
-
-echo "==> Last 50 log lines:"
-$SSH "${REMOTE_DOCKER} compose -f '${NAS_DIR}/docker-compose.yml' logs --tail=50 musup"
+    echo "==> Restarting..."
+    remote "cd '${DEPLOY_DIR}' && docker compose up -d --remove-orphans && docker image prune -f >/dev/null"
+    remote "cd '${DEPLOY_DIR}' && docker compose logs --tail=50 musup"
+    ;;
+  tunnel)
+    echo "Admin UI: http://localhost:${APP_PORT}  (Ctrl+C to close)"
+    ssh "${SSH_OPTS[@]}" -N -L "${APP_PORT}:127.0.0.1:${APP_PORT}" "$TARGET"
+    ;;
+  logs)
+    remote "cd '${DEPLOY_DIR}' && docker compose logs --tail=100 musup"
+    ;;
+  *)
+    echo "Usage: $0 [setup|deploy|tunnel|logs]"
+    exit 1
+    ;;
+esac

@@ -1,11 +1,13 @@
 # Copy this file to deploy.local.sh and fill in your values.
 # deploy.local.sh is git-ignored — never commit it.
 
-NAS_USER=your-nas-username
-NAS_HOST=your-nas-hostname.local
-NAS_PORT=22
-NAS_DIR=/path/to/musup/on/nas
+# Oracle Ubuntu images log in as "ubuntu"; Oracle Linux images as "opc".
+DEPLOY_USER=ubuntu
+DEPLOY_HOST=your.vm.public.ip
+DEPLOY_PORT=22
+SSH_KEY=~/.ssh/your-oracle-key
 
-# Full path to docker binary on the NAS
-# Synology ContainerManager: /var/packages/ContainerManager/target/usr/bin/docker
-REMOTE_DOCKER=/path/to/docker
+# Optional overrides
+# DEPLOY_DIR=/home/ubuntu/musup
+# DEPLOY_PLATFORM=linux/arm64   # use linux/amd64 for an x86 VM
+# APP_PORT=8787
