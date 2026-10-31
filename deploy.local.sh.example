@@ -1,0 +1,11 @@
+# Copy this file to deploy.local.sh and fill in your values.
+# deploy.local.sh is git-ignored — never commit it.
+
+NAS_USER=your-nas-username
+NAS_HOST=your-nas-hostname.local
+NAS_PORT=22
+NAS_DIR=/path/to/musup/on/nas
+
+# Full path to docker binary on the NAS
+# Synology ContainerManager: /var/packages/ContainerManager/target/usr/bin/docker
+REMOTE_DOCKER=/path/to/docker

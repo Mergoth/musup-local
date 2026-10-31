@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+deploy.local.sh
 data/
 musup/node_modules/
 musup/dist/
