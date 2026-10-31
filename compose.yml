@@ -1,0 +1,17 @@
+name: musup
+
+services:
+  musup:
+    build: ./musup
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    environment:
+      DATA_DIR: ${DATA_DIR:-/data}
+      AUTH_DIR: ${AUTH_DIR:-/data/auth}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
+      LOG_LEVEL: ${LOG_LEVEL:-silent}
+      PORT: ${PORT:-8787}
+      WHATSAPP_SYNC_FULL_HISTORY: ${WHATSAPP_SYNC_FULL_HISTORY:-false}
+    ports:
+      - "${PORT:-8787}:${PORT:-8787}" # admin UI and API

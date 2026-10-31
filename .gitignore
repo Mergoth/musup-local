@@ -1,7 +1,12 @@
 .env
-deploy.local.sh
+.env.*
+!.env.example
 data/
-collector/node_modules/
-collector/dist/
-processor/.gradle/
-processor/build/
+musup/node_modules/
+musup/dist/
+musup/data/
+node_modules/
+dist/
+*.log
+npm-debug.log*
+.DS_Store
