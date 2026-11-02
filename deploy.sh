@@ -37,6 +37,11 @@ case "${1:-deploy}" in
       sudo apt-get update -q
       sudo apt-get install -y -q docker.io docker-compose-v2
       sudo usermod -aG docker \$USER
+      if [ ! -f /swapfile ]; then
+        sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+        sudo mkswap /swapfile && sudo swapon /swapfile
+        echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+      fi
       mkdir -p '${DEPLOY_DIR}/data'"
     echo "Done. Run ./deploy.sh to deploy."
     ;;
