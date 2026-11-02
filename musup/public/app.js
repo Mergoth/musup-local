@@ -210,9 +210,7 @@ function renderSettings() {
   $("#llm-model").value = state.settings.llmModel || "";
   $("#llm-api-key").value = state.settings.llmApiKey || "";
   $("#telegram-bot-token").value = state.settings.telegramBotToken || "";
-  $("#telegram-chat-ids").value = (state.settings.telegramChatIds || []).join(
-    "\n",
-  );
+  $("#telegram-chat-ids").value = (state.settings.telegramChatIds || []).join(", ");
   const missing = getMissingSummarySettings(state.settings);
   $("#settings-readiness").textContent = missing.length
     ? `Missing: ${missing.join(", ")}`
