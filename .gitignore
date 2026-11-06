@@ -10,3 +10,4 @@ dist/
 *.log
 npm-debug.log*
 .DS_Store
+scripts/oracle/deploy.local.sh

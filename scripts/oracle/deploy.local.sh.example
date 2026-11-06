@@ -1,0 +1,13 @@
+# Copy this file to scripts/oracle/deploy.local.sh and fill in your values.
+# deploy.local.sh is git-ignored — never commit it.
+
+# Oracle Ubuntu images log in as "ubuntu"; Oracle Linux images as "opc".
+DEPLOY_USER=ubuntu
+DEPLOY_HOST=your.vm.public.ip
+DEPLOY_PORT=22
+SSH_KEY=~/.ssh/your-oracle-key
+
+# Optional overrides
+# DEPLOY_DIR=/home/ubuntu/musup
+# DEPLOY_PLATFORM=linux/arm64   # use linux/amd64 for an x86 VM
+# APP_PORT=8787

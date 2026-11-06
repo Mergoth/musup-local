@@ -1,0 +1,19 @@
+name: musup
+
+services:
+  musup:
+    image: musup:latest
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    env_file: .env
+    environment:
+      DATA_DIR: ${DATA_DIR:-/data}
+      AUTH_DIR: ${AUTH_DIR:-/data/auth}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
+      LOG_LEVEL: ${LOG_LEVEL:-silent}
+      PORT: ${PORT:-8787}
+      WHATSAPP_SYNC_FULL_HISTORY: ${WHATSAPP_SYNC_FULL_HISTORY:-false}
+    # Loopback only: the admin UI is plain HTTP, reach it with `scripts/oracle/deploy.sh tunnel`.
+    ports:
+      - "127.0.0.1:${PORT:-8787}:${PORT:-8787}"
