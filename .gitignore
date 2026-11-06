@@ -11,3 +11,6 @@ dist/
 npm-debug.log*
 .DS_Store
 scripts/oracle/deploy.local.sh
+
+# Brainstorming mockups
+.superpowers/
