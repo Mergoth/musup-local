@@ -8,6 +8,9 @@ import { sendWhatsappText, telegramHtmlToWhatsappText } from "../whatsappDeliver
 import type { DigestResult } from "./types.js";
 import { parseStructuredSummary, renderStructuredSummary } from "./structuredSummary.js";
 import { purgeOldMessages } from "./messageStore.js";
+import { ensureMediaProcessed } from "../media/mediaWorker.js";
+import { getMediaItems } from "../media/mediaStore.js";
+import { applyMediaText } from "../media/mediaText.js";
 import { purgeOldSummaries, recordSummary } from "./summaryStore.js";
 import { getSettings, purgeOldMessageAnchors, recordEvent } from "../db/database.js";
 import {
@@ -75,10 +78,13 @@ export async function runDigest(): Promise<DigestResult> {
       retentionHours: config.messageRetentionHours,
     });
 
-    const messages = loadMessages(
+    const loadedMessages = loadMessages(
       Math.floor(from.getTime() / 1000),
       Math.floor(now.getTime() / 1000)
     );
+    const messageIds = loadedMessages.map((message) => message.messageId);
+    await ensureMediaProcessed(messageIds);
+    const messages = applyMediaText(loadedMessages, getMediaItems(messageIds));
 
     if (messages.length === 0) {
       appLogger.info("No new messages in window");

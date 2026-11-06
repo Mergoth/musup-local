@@ -1,3 +1,5 @@
+import fs from "fs";
+import type { WhatsappMessage } from "../digest/types.js";
 import type { MediaItem } from "./mediaTypes.js";
 
 type MediaTextInput = Pick<MediaItem, "kind" | "status" | "resultText" | "error">;
@@ -26,4 +28,33 @@ export function mediaMessageText(item: MediaTextInput, caption?: string): string
   const text = baseText(item);
   const trimmedCaption = caption?.trim();
   return trimmedCaption ? `${text}\nCaption: ${trimmedCaption}` : text;
+}
+
+// Replaces media messages' text with their description/transcript (or a placeholder).
+export function applyMediaText(
+  messages: WhatsappMessage[],
+  items: Map<string, MediaItem>,
+): WhatsappMessage[] {
+  return messages.map((message) => {
+    const item = items.get(message.messageId);
+    if (!item) {
+      if (message.messageType === "imageMessage" && !message.text) {
+        return { ...message, text: "[picture, not described]" };
+      }
+      if (message.messageType === "audioMessage" && !message.text) {
+        return { ...message, text: "[voice note, not transcribed]" };
+      }
+      return message;
+    }
+
+    const sendablePicture = Boolean(
+      item.kind === "picture" && item.status === "done" && item.filePath && fs.existsSync(item.filePath),
+    );
+    return {
+      ...message,
+      text: mediaMessageText(item, message.text || undefined),
+      sendablePicture,
+      pictureFilePath: sendablePicture ? item.filePath ?? undefined : undefined,
+    };
+  });
 }

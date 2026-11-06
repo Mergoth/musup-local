@@ -40,3 +40,36 @@ test("placeholders for every non-done status", () => {
   ];
   for (const [item, expected] of cases) assert.equal(mediaMessageText(item), expected);
 });
+
+test("applyMediaText fills media messages and marks sendable pictures", async () => {
+  const fs = await import("fs");
+  const os = await import("os");
+  const path = await import("path");
+  const { applyMediaText } = await import("./mediaText.js");
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "musup-media-")), "p.jpg");
+  fs.writeFileSync(file, "img");
+  const base = { chatJid: "a@g.us", chatLabel: "2B", fromMe: false, timestamp: 1, messageDateUtc: "" };
+  const item = (messageId: string, kind: "picture" | "voice", status: "done" | "failed", filePath: string | null) => ({
+    messageId, chatJid: "a@g.us", kind, status, mimeType: "", filePath,
+    resultText: status === "done" ? "Flyer" : null, error: null, attempts: 1, createdAt: "", updatedAt: "",
+  });
+  const out = applyMediaText(
+    [
+      { ...base, messageId: "ok", messageType: "imageMessage", text: "" },
+      { ...base, messageId: "bad", messageType: "imageMessage", text: "ver" },
+      { ...base, messageId: "none", messageType: "audioMessage", text: "" },
+      { ...base, messageId: "txt", messageType: "conversation", text: "hola" },
+    ],
+    new Map([
+      ["ok", item("ok", "picture", "done", file)],
+      ["bad", item("bad", "picture", "failed", null)],
+    ]),
+  );
+  assert.equal(out[0]?.text, "[picture] Flyer");
+  assert.equal(out[0]?.sendablePicture, true);
+  assert.equal(out[0]?.pictureFilePath, file);
+  assert.equal(out[1]?.text, "[picture, not described]\nCaption: ver");
+  assert.equal(out[1]?.sendablePicture, false);
+  assert.equal(out[2]?.text, "[voice note, not transcribed]");
+  assert.equal(out[3]?.text, "hola");
+});

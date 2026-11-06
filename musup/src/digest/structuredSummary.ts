@@ -1,10 +1,20 @@
+import type { WhatsappMessage } from "./types.js";
+
+export type SummaryPicture = {
+  messageId: string;
+  caption: string;
+};
+
 export type StructuredSummaryChat = {
   chatJid?: string;
   chatName: string;
   discussed: string[];
   conclusions: string[];
   actionItems: string[];
+  pictures: SummaryPicture[];
 };
+
+export type SelectedPicture = SummaryPicture & { filePath: string };
 
 export type StructuredSummary = {
   noActionRequiredText: string;
@@ -35,6 +45,14 @@ function readString(value: unknown): string {
 function readStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map(readString).filter(Boolean);
+}
+
+function readPictures(value: unknown): SummaryPicture[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({ messageId: readString(item.messageId), caption: readString(item.caption) }))
+    .filter((picture) => picture.messageId);
 }
 
 function escapeTelegramHtml(value: string): string {
@@ -68,6 +86,7 @@ export function parseStructuredSummary(raw: string): StructuredSummary {
       discussed: readStringArray(item.discussed),
       conclusions: readStringArray(item.conclusions),
       actionItems: readStringArray(item.actionItems),
+      pictures: readPictures(item.pictures),
     }))
     .filter(
       (chat) =>
@@ -113,4 +132,27 @@ export function renderStructuredSummary(summary: StructuredSummary): string {
   });
 
   return blocks.join("\n\n");
+}
+
+// The model may only pick real, still-stored pictures from the chat it is summarising.
+export function selectPictures(
+  chat: StructuredSummaryChat,
+  sendable: Map<string, WhatsappMessage>,
+): SelectedPicture[] {
+  const selected: SelectedPicture[] = [];
+  const seen = new Set<string>();
+
+  for (const picture of chat.pictures) {
+    const message = sendable.get(picture.messageId);
+    if (!message?.sendablePicture || !message.pictureFilePath || seen.has(picture.messageId)) continue;
+    const sameChat = chat.chatJid
+      ? message.chatJid === chat.chatJid
+      : message.chatLabel === chat.chatName;
+    if (!sameChat) continue;
+
+    seen.add(picture.messageId);
+    selected.push({ ...picture, filePath: message.pictureFilePath });
+  }
+
+  return selected;
 }
