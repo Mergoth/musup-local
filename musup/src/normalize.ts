@@ -1,4 +1,4 @@
-import type { WAMessage } from "@whiskeysockets/baileys";
+import { normalizeMessageContent, type WAMessage } from "@whiskeysockets/baileys";
 
 export type NormalizedMessage = {
   messageId: string;
@@ -32,7 +32,8 @@ function detectMessageType(msg: BaileysMessage): string {
 }
 
 export function extractText(message: WAMessage): string | undefined {
-  const msg = message.message;
+  // Disappearing, view-once and edited messages wrap the real content one level down.
+  const msg = normalizeMessageContent(message.message);
   if (!msg) return undefined;
 
   return (
@@ -52,7 +53,7 @@ export function normalizeMessage(message: WAMessage): NormalizedMessage | null {
     return null;
   }
 
-  const msg = message.message;
+  const msg = normalizeMessageContent(message.message);
   const messageType = msg ? detectMessageType(msg) : "unknown";
 
   return {

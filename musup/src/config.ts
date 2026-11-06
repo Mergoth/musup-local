@@ -2,6 +2,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+function positiveHours(value: string | undefined, fallback: number): number {
+  const hours = Number(value);
+  return Number.isFinite(hours) && hours >= 1 ? hours : fallback;
+}
+
 const dataDir = process.env.DATA_DIR || "./data";
 
 export const config = {
@@ -12,7 +17,9 @@ export const config = {
 
   digestCron: "0 0 9,18 * * ?",
   digestTimezone: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-  messageRetentionHours: 24,
+  // Unsummarized messages are kept this long; summarized ones are dropped after summarizedMessageRetentionHours.
+  messageRetentionHours: positiveHours(process.env.MESSAGE_RETENTION_HOURS, 168),
+  summarizedMessageRetentionHours: positiveHours(process.env.SUMMARIZED_MESSAGE_RETENTION_HOURS, 24),
   summaryRetentionHours: 36,
   whatsappSyncFullHistory: process.env.WHATSAPP_SYNC_FULL_HISTORY === "true",
 

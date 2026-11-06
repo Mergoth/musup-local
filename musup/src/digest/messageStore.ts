@@ -221,7 +221,10 @@ export function markExistingMessagesUnprocessed(): {
   };
 }
 
-export function purgeOldMessages(retentionHours = config.messageRetentionHours): {
+export function purgeOldMessages(
+  retentionHours = config.messageRetentionHours,
+  summarizedRetentionHours = config.summarizedMessageRetentionHours,
+): {
   deletedFiles: number;
   cutoff: string;
 } {
@@ -229,12 +232,21 @@ export function purgeOldMessages(retentionHours = config.messageRetentionHours):
     return { deletedFiles: 0, cutoff: new Date().toISOString() };
   }
 
-  const safeRetentionHours = Math.max(1, Number.isFinite(retentionHours) ? retentionHours : 24);
-  const cutoffMs = Date.now() - safeRetentionHours * 60 * 60 * 1000;
+  const safeHours = (hours: number, fallback: number) =>
+    Math.max(1, Number.isFinite(hours) ? hours : fallback);
+  const cutoffMs = Date.now() - safeHours(retentionHours, 168) * 60 * 60 * 1000;
+  const summarizedCutoffMs =
+    Date.now() - safeHours(summarizedRetentionHours, 24) * 60 * 60 * 1000;
+  const processed = getProcessedIds();
   let deletedFiles = 0;
 
+  // Past the hard cutoff a file always goes; past the summarized cutoff only once
+  // every message in it was summarized, so a skipped or failed digest loses nothing.
   const removeIfOld = (filePath: string, bucketMs: number) => {
-    if (bucketMs >= cutoffMs) return;
+    if (bucketMs >= summarizedCutoffMs) return;
+    if (bucketMs >= cutoffMs && parseFile(filePath).some((m) => !processed.has(m.messageId))) {
+      return;
+    }
     fs.unlinkSync(filePath);
     deletedFiles += 1;
   };
@@ -253,11 +265,9 @@ export function purgeOldMessages(retentionHours = config.messageRetentionHours):
     if (fs.readdirSync(entryPath).length === 0) fs.rmdirSync(entryPath);
   }
 
-  const processed = getProcessedIds();
   let removedProcessed = 0;
   const retainedMessageIds = new Set<string>();
-  const nowTs = Math.ceil(Date.now() / 1000);
-  for (const filePath of listMessageFiles(nowTs - safeRetentionHours * 60 * 60, nowTs + 1)) {
+  for (const filePath of listStoredMessageFiles()) {
     for (const message of parseFile(filePath)) retainedMessageIds.add(message.messageId);
   }
   for (const id of [...processed]) {
@@ -266,6 +276,7 @@ export function purgeOldMessages(retentionHours = config.messageRetentionHours):
     removedProcessed += 1;
   }
   if (removedProcessed > 0) {
+    fs.mkdirSync(path.dirname(processedFile), { recursive: true });
     fs.writeFileSync(
       processedFile,
       JSON.stringify(Object.fromEntries([...processed].map((id) => [id, true])), null, 2),
