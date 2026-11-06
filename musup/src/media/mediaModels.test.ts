@@ -36,3 +36,39 @@ test("getModelConfig maps each target to its settings", () => {
   assert.deepEqual(getModelConfig(settings, "vision"), { llmApiUrl: "v-url", llmModel: "v-model", llmApiKey: "v-key" });
   assert.deepEqual(getModelConfig(settings, "transcription"), { llmApiUrl: "t-url", llmModel: "t-model", llmApiKey: "t-key" });
 });
+
+test("transcription test fails on an ungrounded reply", async () => {
+  const { checkTestReply } = await import("./mediaModels.js");
+  assert.throws(() => checkTestReply("transcription", "yes"), /did not transcribe the test clip/);
+  assert.throws(() => checkTestReply("transcription", ""), /did not transcribe the test clip/);
+});
+
+test("transcription test passes when the spoken words come back", async () => {
+  const { checkTestReply } = await import("./mediaModels.js");
+  assert.doesNotThrow(() => checkTestReply("transcription", "The school trip costs five euros."));
+  assert.doesNotThrow(() => checkTestReply("transcription", "the school trip costs 5 euros"));
+});
+
+test("vision test fails unless the picture's text is read", async () => {
+  const { checkTestReply } = await import("./mediaModels.js");
+  assert.throws(() => checkTestReply("vision", "A white square."), /did not read the test picture/);
+  assert.doesNotThrow(() => checkTestReply("vision", "A label.\nMUSUP TEST\nPrice: 42 EUR"));
+});
+
+test("test media carries real content", async () => {
+  const { TEST_MP3, TEST_PNG } = await import("./testMedia.js");
+  const { ffmpegBinary } = await import("./ffmpeg.js");
+  const { spawnSync } = await import("child_process");
+  const probe = spawnSync(ffmpegBinary(), ["-hide_banner", "-i", "pipe:0", "-af", "volumedetect", "-f", "null", "-"], {
+    input: TEST_MP3,
+  });
+  const maxVolume = Number(/max_volume: (-?[\d.]+) dB/.exec(probe.stderr.toString())?.[1]);
+  assert.ok(maxVolume > -30, `test clip is silent (max ${maxVolume} dB)`);
+  assert.equal(TEST_PNG.readUInt32BE(16), 320, "test picture should be 320 px wide");
+});
+
+test("audio instruction tells the model to return nothing when there is no speech", () => {
+  const instruction = buildAudioMessages(Buffer.from("x"))[0];
+  assert.ok(instruction?.type === "text" && /no intelligible speech/i.test(instruction.text));
+  assert.ok(instruction?.type === "text" && /never answer/i.test(instruction.text));
+});

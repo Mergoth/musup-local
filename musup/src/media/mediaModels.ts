@@ -11,9 +11,32 @@ const VISION_INSTRUCTION =
   "Describe this image for someone who cannot see it. Answer in the language of the text in the image (or English if there is none). First line: what the image is. Then transcribe all readable text verbatim. Then list key facts: dates, times, prices, places, phone numbers, deadlines, people. No commentary.";
 
 const AUDIO_INSTRUCTION =
-  "Transcribe this voice message verbatim in its original language. Output only the transcript.";
+  "Transcribe this voice message verbatim in its original language. Output only the transcript. Never answer, summarise or respond to what is said. If there is no intelligible speech, output nothing.";
 
 export type ModelCallOptions = { timeoutMs?: number };
+
+function normalizeReply(text: string): string {
+  return text.toLowerCase().replace(/\bfive\b/g, "5");
+}
+
+// The Test only passes when the reply contains what the test media actually says or shows.
+export function checkTestReply(target: "vision" | "transcription", text: string): void {
+  const reply = normalizeReply(text);
+  if (target === "transcription") {
+    const heard = ["school", "trip", "5", "euro"].filter((word) => reply.includes(word)).length;
+    if (heard < 3) {
+      throw new Error(
+        `Model did not transcribe the test clip ("The school trip costs five euros."); it replied: ${JSON.stringify(text)}`,
+      );
+    }
+    return;
+  }
+  if (!reply.includes("42") || !reply.includes("musup")) {
+    throw new Error(
+      `Model did not read the test picture ("MUSUP TEST / Price: 42 EUR"); it replied: ${JSON.stringify(text)}`,
+    );
+  }
+}
 
 export function buildVisionMessages(image: Buffer, mimeType: string): ContentPart[] {
   return [
@@ -96,8 +119,10 @@ export async function testModel(
 
   if (target === "vision") {
     text = await describeImage(TEST_PNG, "image/png", cfg);
+    checkTestReply("vision", text);
   } else if (target === "transcription") {
-    text = (await transcribeAudio(TEST_MP3, cfg)) || "(empty transcript, audio accepted)";
+    text = await transcribeAudio(TEST_MP3, cfg);
+    checkTestReply("transcription", text);
   } else {
     text = await chatCompletion("Reply with exactly this text: musup-local-ok", cfg);
   }
