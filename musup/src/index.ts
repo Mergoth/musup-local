@@ -107,16 +107,24 @@ async function saveNormalizedMessage(
   });
   incrementCounter("detectedChats");
 
-  if (!shouldStoreMessageText(normalized.chatJid)) {
+  const skipReason = !shouldStoreMessageText(normalized.chatJid)
+    ? "not_subscribed"
+    : !normalized.text
+      ? "no_text"
+      : normalized.timestamp < Date.now() / 1000 - config.messageRetentionHours * 60 * 60
+        ? "too_old"
+        : null;
+  if (skipReason) {
     incrementCounter("skippedMessages");
-    return false;
-  }
-  if (!normalized.text) {
-    incrementCounter("skippedMessages");
-    return false;
-  }
-  if (normalized.timestamp < Date.now() / 1000 - config.messageRetentionHours * 60 * 60) {
-    incrementCounter("skippedMessages");
+    if (skipReason !== "not_subscribed") {
+      appLogger.info("Message skipped", {
+        reason: skipReason,
+        source,
+        chatName,
+        messageType: normalized.messageType,
+        timestamp: normalized.timestamp,
+      });
+    }
     return false;
   }
 
