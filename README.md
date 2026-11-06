@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>Your noisy WhatsApp groups, summarised by AI — delivered to Telegram or WhatsApp.</b><br/>
-  Self-hosted. One container. No cloud accounts.
+  Self-hosted. One container. Runs on your NAS, a home server, or a free cloud VM.
 </p>
 
 <p align="center">
@@ -19,10 +19,11 @@
 School chats, house committees, family groups — hundreds of messages a day, three of which matter. **musup** links to your WhatsApp as a device, quietly reads the chats you pick, and sends you a short digest on your schedule.
 
 ```
-WhatsApp chats ──▶ musup (your box) ──▶ LLM ──▶ Telegram / WhatsApp digest
+WhatsApp chats ──▶ musup (NAS / server / cloud VM) ──▶ LLM ──▶ Telegram / WhatsApp digest
 ```
 
-- 🔒 **Private** — messages stay on your machine; only the digest prompt goes to the LLM you choose
+- 🔒 **Private** — messages stay on a host you control; only the digest prompt goes to the LLM you choose
+- ☁️ **Runs anywhere** — anything with Docker: Synology/QNAP, a Raspberry Pi, Oracle Cloud Always Free, any VPS
 - 🧠 **Any LLM** — OpenAI, Gemini, Ollama, or anything OpenAI-compatible
 - 🌍 **Any language** — summaries in your language, whatever the chat speaks
 - 🖥️ **Web UI** — link, pick chats, schedule, edit the prompt; no config files
@@ -34,10 +35,12 @@ git clone https://github.com/Mergoth/musup-local.git musup && cd musup
 docker compose up -d --build
 ```
 
-Open **http://localhost:8787** and set an admin password. Data lives in `./data` (change the volume in `compose.yml` to move it, e.g. to a NAS).
+Open **http://localhost:8787** and set an admin password. Data lives in `./data`; change the volume in `compose.yml` to move it, e.g. on a NAS.
 
-<details>
-<summary><b>Deploy to an Oracle Cloud free VM</b></summary>
+The same works on any cloud VM or VPS with Docker. For Oracle Cloud there's a ready-made script:
+
+<details open>
+<summary><b>Deploy to an Oracle Cloud Always Free VM</b></summary>
 
 ```bash
 cp scripts/oracle/deploy.local.sh.example scripts/oracle/deploy.local.sh   # host, user, SSH key
