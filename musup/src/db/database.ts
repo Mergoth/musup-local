@@ -16,6 +16,12 @@ export type AppSettings = {
   llmApiUrl: string;
   llmModel: string;
   llmApiKey: string;
+  visionApiUrl: string;
+  visionModel: string;
+  visionApiKey: string;
+  transcriptionApiUrl: string;
+  transcriptionModel: string;
+  transcriptionApiKey: string;
   telegramBotToken: string;
   telegramChatIds: string[];
 };
@@ -63,18 +69,18 @@ function sqlJsWasmPath(file: string): string {
   return path.join(path.dirname(currentFile), "../../node_modules/sql.js/dist", file);
 }
 
-function saveDb(): void {
+export function saveDb(): void {
   if (!db) throw new Error("Database is not initialized");
   fs.mkdirSync(path.dirname(dbFile), { recursive: true });
   fs.writeFileSync(dbFile, Buffer.from(db.export()));
 }
 
-function getDb(): Database {
+export function getDb(): Database {
   if (!db) throw new Error("Database is not initialized");
   return db;
 }
 
-function firstRow(sql: string, params: SqlValue[] = []): Record<string, SqlValue> | undefined {
+export function firstRow(sql: string, params: SqlValue[] = []): Record<string, SqlValue> | undefined {
   const stmt = getDb().prepare(sql, params);
   try {
     return stmt.step() ? stmt.getAsObject() : undefined;
@@ -83,7 +89,7 @@ function firstRow(sql: string, params: SqlValue[] = []): Record<string, SqlValue
   }
 }
 
-function allRows(sql: string, params: SqlValue[] = []): Record<string, SqlValue>[] {
+export function allRows(sql: string, params: SqlValue[] = []): Record<string, SqlValue>[] {
   const stmt = getDb().prepare(sql, params);
   const rows: Record<string, SqlValue>[] = [];
   try {
@@ -218,7 +224,22 @@ export async function initDatabase(): Promise<void> {
       expires_at text not null
     );
 
+    create table if not exists media_items (
+      message_id text primary key,
+      chat_jid text not null,
+      kind text not null,
+      status text not null,
+      mime_type text not null default '',
+      file_path text,
+      result_text text,
+      error text,
+      attempts integer not null default 0,
+      created_at text not null,
+      updated_at text not null
+    );
+
     create index if not exists idx_chats_subscribed on chats(subscribed);
+    create index if not exists idx_media_items_status on media_items(status);
     create index if not exists idx_events_ts on events(ts);
     create index if not exists idx_message_anchors_timestamp on message_anchors(timestamp);
     create index if not exists idx_auth_sessions_expires_at on auth_sessions(expires_at);
@@ -237,6 +258,12 @@ export async function initDatabase(): Promise<void> {
   seedSetting("llmApiUrl", config.llmApiUrl);
   seedSetting("llmModel", config.llmModel);
   seedSetting("llmApiKey", config.llmApiKey);
+  seedSetting("visionApiUrl", "");
+  seedSetting("visionModel", "");
+  seedSetting("visionApiKey", "");
+  seedSetting("transcriptionApiUrl", "");
+  seedSetting("transcriptionModel", "");
+  seedSetting("transcriptionApiKey", "");
   seedSetting("telegramBotToken", config.telegramBotToken || "");
   seedSetting("telegramChatIds", JSON.stringify(config.telegramChatIds));
   if (shouldResetScheduleForTimezone) {
@@ -261,6 +288,12 @@ export function getSettings(): AppSettings {
     llmApiUrl: getSetting("llmApiUrl") || config.llmApiUrl,
     llmModel: getSetting("llmModel") || config.llmModel,
     llmApiKey: getSetting("llmApiKey") || "",
+    visionApiUrl: getSetting("visionApiUrl") || "",
+    visionModel: getSetting("visionModel") || "",
+    visionApiKey: getSetting("visionApiKey") || "",
+    transcriptionApiUrl: getSetting("transcriptionApiUrl") || "",
+    transcriptionModel: getSetting("transcriptionModel") || "",
+    transcriptionApiKey: getSetting("transcriptionApiKey") || "",
     telegramBotToken: getSetting("telegramBotToken") || "",
     telegramChatIds: parseJsonArray(getSetting("telegramChatIds")),
   };
@@ -307,6 +340,12 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   if (typeof patch.llmApiUrl === "string") setSettingValue("llmApiUrl", patch.llmApiUrl);
   if (typeof patch.llmModel === "string") setSettingValue("llmModel", patch.llmModel);
   if (typeof patch.llmApiKey === "string") setSettingValue("llmApiKey", patch.llmApiKey);
+  if (typeof patch.visionApiUrl === "string") setSettingValue("visionApiUrl", patch.visionApiUrl);
+  if (typeof patch.visionModel === "string") setSettingValue("visionModel", patch.visionModel);
+  if (typeof patch.visionApiKey === "string") setSettingValue("visionApiKey", patch.visionApiKey);
+  if (typeof patch.transcriptionApiUrl === "string") setSettingValue("transcriptionApiUrl", patch.transcriptionApiUrl);
+  if (typeof patch.transcriptionModel === "string") setSettingValue("transcriptionModel", patch.transcriptionModel);
+  if (typeof patch.transcriptionApiKey === "string") setSettingValue("transcriptionApiKey", patch.transcriptionApiKey);
   if (typeof patch.telegramBotToken === "string") {
     setSettingValue("telegramBotToken", patch.telegramBotToken);
   }

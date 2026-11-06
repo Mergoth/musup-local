@@ -170,22 +170,37 @@
                 <label class="switch-row static-row">
                   <span>
                     <strong>Model settings</strong>
-                    <small>Configure the model used to generate summaries.</small>
+                    <small>Digest writes the summary; Vision and Transcription read pictures and voice notes.</small>
                   </span>
                   <span class="switch-spacer" aria-hidden="true"></span>
                 </label>
                 <p id="settings-readiness" class="muted">Configure required fields before enabling summaries.</p>
+                <div class="model-tabs" role="tablist" aria-label="Model configuration">
+                  <button class="model-tab active" type="button" role="tab" aria-selected="true" data-model-target="digest">Digest</button>
+                  <button class="model-tab" type="button" role="tab" aria-selected="false" data-model-target="vision">Vision</button>
+                  <button class="model-tab" type="button" role="tab" aria-selected="false" data-model-target="transcription">Transcription</button>
+                </div>
+                <p id="model-tab-hint" class="muted model-tab-hint">Writes the summary.</p>
                 <label class="setting-row">
                   <span>API URL</span>
-                  <input id="llm-api-url" name="llmApiUrl" type="url" />
+                  <span class="input-with-action">
+                    <input id="llm-api-url" name="llmApiUrl" type="url" />
+                    <button class="secondary-button copy-to-all" type="button" data-field="url" title="Copy to all three models">⇉ copy to all</button>
+                  </span>
                 </label>
                 <label class="setting-row">
                   <span>Model</span>
-                  <input id="llm-model" name="llmModel" type="text" />
+                  <span class="input-with-action">
+                    <input id="llm-model" name="llmModel" type="text" />
+                    <button class="secondary-button copy-to-all" type="button" data-field="model" title="Copy to all three models">⇉ copy to all</button>
+                  </span>
                 </label>
                 <label class="setting-row">
                   <span>API key</span>
-                  <input id="llm-api-key" name="llmApiKey" type="password" autocomplete="off" />
+                  <span class="input-with-action">
+                    <input id="llm-api-key" name="llmApiKey" type="password" autocomplete="off" />
+                    <button class="secondary-button copy-to-all" type="button" data-field="key" title="Copy to all three models">⇉ copy to all</button>
+                  </span>
                 </label>
                 <div class="form-actions">
                   <button id="test-llm-button" class="secondary-button" type="button">

@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { appLogger } from "../appLogger.js";
 import type { WhatsappMessage } from "./types.js";
 import { getSubscribedChatJids } from "../db/database.js";
+import { purgeMediaItems } from "../media/mediaStore.js";
 
 const messagesDir = path.join(config.dataDir, "messages");
 const processedFile = path.join(config.dataDir, "processed.json");
@@ -36,8 +37,11 @@ function parseMessageLine(
     const chatJid = typeof node.chatJid === "string" ? node.chatJid : "";
     const timestamp = typeof node.timestamp === "number" ? node.timestamp : 0;
     const text = typeof node.text === "string" ? node.text.trim() : "";
+    const messageType = typeof node.messageType === "string" ? node.messageType : "unknown";
+    // Pictures and voice notes may have no text; their content comes from media_items.
+    const isMedia = messageType === "imageMessage" || messageType === "audioMessage";
 
-    if (!messageId || !chatJid || !timestamp || !text) return null;
+    if (!messageId || !chatJid || !timestamp || (!text && !isMedia)) return null;
 
     return {
       messageId,
@@ -46,7 +50,7 @@ function parseMessageLine(
       senderJid: typeof node.senderJid === "string" ? node.senderJid : undefined,
       fromMe: Boolean(node.fromMe),
       timestamp,
-      messageType: typeof node.messageType === "string" ? node.messageType : "unknown",
+      messageType,
       text,
     };
   } catch (err) {
@@ -284,10 +288,13 @@ export function purgeOldMessages(
     );
   }
 
-  if (deletedFiles > 0 || removedProcessed > 0) {
+  const purgedMedia = purgeMediaItems(retainedMessageIds);
+
+  if (deletedFiles > 0 || removedProcessed > 0 || purgedMedia > 0) {
     appLogger.info("Purged old message storage", {
       deletedFiles,
       removedProcessed,
+      purgedMedia,
       cutoff: new Date(cutoffMs).toISOString(),
     });
   }

@@ -206,9 +206,10 @@ function renderSettings() {
     state.settings.digestTimezone || getBrowserTimezone(),
   );
   renderScheduleTimes();
-  $("#llm-api-url").value = state.settings.llmApiUrl || "";
-  $("#llm-model").value = state.settings.llmModel || "";
-  $("#llm-api-key").value = state.settings.llmApiKey || "";
+  if (!state.modelDraft || !$("#save-llm-button").classList.contains("dirty")) {
+    state.modelDraft = loadModelDraft(state.settings);
+  }
+  showModelFields(state.modelTab);
   $("#telegram-bot-token").value = state.settings.telegramBotToken || "";
   $("#telegram-chat-ids").value = (state.settings.telegramChatIds || []).join(", ");
   const missing = getMissingSummarySettings(state.settings);
@@ -248,6 +249,70 @@ function renderWhatsappDeliveryTargets() {
   } else {
     hint.textContent = "Subscribed source chats are not valid delivery targets.";
   }
+}
+
+const modelSettingKeys = {
+  digest: { url: "llmApiUrl", model: "llmModel", key: "llmApiKey" },
+  vision: { url: "visionApiUrl", model: "visionModel", key: "visionApiKey" },
+  transcription: {
+    url: "transcriptionApiUrl",
+    model: "transcriptionModel",
+    key: "transcriptionApiKey",
+  },
+};
+const modelTabLabels = { digest: "Digest", vision: "Vision", transcription: "Transcription" };
+const modelTabHints = {
+  digest: "Writes the summary.",
+  vision: "Describes pictures. Leave empty to skip pictures.",
+  transcription:
+    "Transcribes voice notes. Use a chat endpoint, or a URL ending in /audio/transcriptions for Whisper-style APIs. Leave empty to skip voice notes.",
+};
+const modelFieldInputs = { url: "#llm-api-url", model: "#llm-model", key: "#llm-api-key" };
+state.modelTab = "digest";
+state.modelDraft = null;
+
+function loadModelDraft(settings) {
+  const draft = {};
+  for (const [target, keys] of Object.entries(modelSettingKeys)) {
+    draft[target] = {
+      url: settings[keys.url] || "",
+      model: settings[keys.model] || "",
+      key: settings[keys.key] || "",
+    };
+  }
+  return draft;
+}
+
+function readModelFields() {
+  return {
+    url: $(modelFieldInputs.url).value.trim(),
+    model: $(modelFieldInputs.model).value.trim(),
+    key: $(modelFieldInputs.key).value,
+  };
+}
+
+function showModelFields(target) {
+  const values = state.modelDraft?.[target] || { url: "", model: "", key: "" };
+  for (const [field, selector] of Object.entries(modelFieldInputs)) {
+    $(selector).value = values[field];
+  }
+  $$(".model-tab").forEach((tab) => {
+    const active = tab.dataset.modelTarget === target;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
+  $("#model-tab-hint").textContent = modelTabHints[target];
+}
+
+function modelSettingsPatch() {
+  state.modelDraft[state.modelTab] = readModelFields();
+  const patch = {};
+  for (const [target, keys] of Object.entries(modelSettingKeys)) {
+    patch[keys.url] = state.modelDraft[target].url;
+    patch[keys.model] = state.modelDraft[target].model;
+    patch[keys.key] = state.modelDraft[target].key;
+  }
+  return patch;
 }
 
 function setSaveDirty(selector, dirty) {
@@ -338,6 +403,7 @@ function renderSummaries() {
         <div class="summary-badges">
           <span class="pill ${statusClass}">${escapeHtml(summary.status)}</span>
           <span class="type-badge">${Number(summary.messageCount || 0)} messages</span>
+          ${summary.pictures?.length ? `<span class="type-badge">📷 ${summary.pictures.length}</span>` : ""}
           <span class="type-badge">${summary.deliveredToTelegram ? "Telegram sent" : "Telegram off"}</span>
           <span class="type-badge">${summary.deliveredToWhatsapp ? "WhatsApp sent" : "WhatsApp off"}</span>
         </div>
@@ -840,17 +906,35 @@ $("#schedule-times-list").addEventListener("click", async (event) => {
   }
 });
 
+$$(".model-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    if (!state.modelDraft) return;
+    state.modelDraft[state.modelTab] = readModelFields();
+    state.modelTab = tab.dataset.modelTarget;
+    showModelFields(state.modelTab);
+    $("#llm-test-result").textContent = "";
+  });
+});
+
+$$(".copy-to-all").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (!state.modelDraft) return;
+    const field = button.dataset.field;
+    const value = readModelFields()[field];
+    for (const target of Object.keys(modelSettingKeys)) {
+      state.modelDraft[target][field] = value;
+    }
+    setSaveDirty("#save-llm-button", true);
+    const result = $("#llm-test-result");
+    result.className = "form-result";
+    result.textContent = "Copied to Digest, Vision and Transcription. Save to keep it.";
+  });
+});
+
 $("#save-llm-button").addEventListener("click", async () => {
   try {
-    await saveSettingsPatch(
-      {
-        llmApiUrl: $("#llm-api-url").value.trim(),
-        llmModel: $("#llm-model").value.trim(),
-        llmApiKey: $("#llm-api-key").value,
-      },
-      "#llm-test-result",
-      "LLM settings saved.",
-    );
+    await saveSettingsPatch(modelSettingsPatch(), "#llm-test-result", "Model settings saved.");
     setSaveDirty("#save-llm-button", false);
   } catch (err) {
     $("#llm-test-result").className = "form-result error-text";
@@ -933,15 +1017,18 @@ $("#test-llm-button").addEventListener("click", async () => {
   result.textContent = "Testing...";
 
   try {
+    const target = state.modelTab;
+    const fields = readModelFields();
     const response = await api("/api/settings/test-llm", {
       method: "POST",
       body: JSON.stringify({
-        llmApiUrl: $("#llm-api-url").value.trim(),
-        llmModel: $("#llm-model").value.trim(),
-        llmApiKey: $("#llm-api-key").value,
+        target,
+        llmApiUrl: fields.url,
+        llmModel: fields.model,
+        llmApiKey: fields.key,
       }),
     });
-    result.textContent = `Connected in ${response.latencyMs} ms. Reply: ${response.text}`;
+    result.textContent = `${modelTabLabels[target]}: connected in ${response.latencyMs} ms. Reply: ${response.text}`;
   } catch (err) {
     result.className = "form-result error-text";
     result.textContent = err instanceof Error ? err.message : String(err);

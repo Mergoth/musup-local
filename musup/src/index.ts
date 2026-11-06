@@ -1,5 +1,7 @@
 import makeWASocket, {
   DisconnectReason,
+  downloadMediaMessage,
+  type WAMessage,
   fetchLatestBaileysVersion,
   proto,
   useMultiFileAuthState,
@@ -36,6 +38,8 @@ import {
 import { configureBackfillHandler, recordBackfillHistory } from "./whatsappBackfill.js";
 import { configureWhatsappDeliveryHandler } from "./whatsappDelivery.js";
 import type { NormalizedMessage } from "./normalize.js";
+import { scheduleMediaIngest, type MediaDownloader } from "./media/mediaIngest.js";
+import { enqueueMedia, startMediaWorker } from "./media/mediaWorker.js";
 
 type MessageSource = "live" | "history";
 
@@ -88,9 +92,11 @@ async function resolveChatName(
 }
 
 async function saveNormalizedMessage(
+  message: WAMessage,
   normalized: NormalizedMessage,
   chatName: string,
   source: MessageSource,
+  download: MediaDownloader,
 ): Promise<boolean> {
   upsertChat({
     jid: normalized.chatJid,
@@ -109,7 +115,7 @@ async function saveNormalizedMessage(
 
   const skipReason = !shouldStoreMessageText(normalized.chatJid)
     ? "not_subscribed"
-    : !normalized.text
+    : !normalized.text && !normalized.media
       ? "no_text"
       : normalized.timestamp < Date.now() / 1000 - config.messageRetentionHours * 60 * 60
         ? "too_old"
@@ -132,6 +138,8 @@ async function saveNormalizedMessage(
     const appended = appendMessage(normalized, chatName);
     if (!appended) return false;
     incrementCounter("savedMessages");
+
+    if (normalized.media) scheduleMediaIngest(message, normalized, download, enqueueMedia);
 
     appLogger.debug("Message saved", {
       source,
@@ -221,8 +229,11 @@ async function startCollector() {
     };
   });
 
-  configureWhatsappDeliveryHandler(async (jid, text) => {
-    const result = await sock.sendMessage(jid, { text });
+  const downloadMedia: MediaDownloader = (message) =>
+    downloadMediaMessage(message, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
+
+  configureWhatsappDeliveryHandler(async (jid, payload) => {
+    const result = await sock.sendMessage(jid, payload);
     return {
       jid,
       messageId: result?.key?.id || undefined,
@@ -290,7 +301,13 @@ async function startCollector() {
         normalized.chatJid,
         message.pushName ?? undefined
       );
-      await saveNormalizedMessage(normalized, chatName, type === "append" ? "history" : "live");
+      await saveNormalizedMessage(
+        message,
+        normalized,
+        chatName,
+        type === "append" ? "history" : "live",
+        downloadMedia,
+      );
     }
   });
 
@@ -307,7 +324,9 @@ async function startCollector() {
         normalized.chatJid,
         message.pushName ?? undefined,
       );
-      if (await saveNormalizedMessage(normalized, chatName, "history")) saved += 1;
+      if (await saveNormalizedMessage(message, normalized, chatName, "history", downloadMedia)) {
+        saved += 1;
+      }
     }
 
     const backfill = recordBackfillHistory(peerDataRequestSessionId, messages.length, saved);
@@ -326,6 +345,7 @@ async function startCollector() {
 await initDatabase();
 ensurePromptTemplates();
 purgeOldMessages();
+startMediaWorker();
 purgeOldSummaries();
 purgeOldMessageAnchors();
 recordEvent("info", "app.start", "musup-local app started");

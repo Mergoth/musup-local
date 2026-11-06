@@ -19,6 +19,7 @@ declare module "sql.js" {
     run(sql: string, params?: SqlValue[]): Database;
     prepare(sql: string, params?: SqlValue[]): Statement;
     export(): Uint8Array;
+    getRowsModified(): number;
   };
 
   export type SqlJsStatic = {

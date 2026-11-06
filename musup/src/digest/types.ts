@@ -8,6 +8,9 @@ export type WhatsappMessage = {
   messageDateUtc: string;
   messageType: string;
   text: string;
+  // Set for pictures whose file is still on disk and can be sent with the digest.
+  sendablePicture?: boolean;
+  pictureFilePath?: string;
 };
 
 export type DigestResult = {
@@ -20,4 +23,5 @@ export type DigestResult = {
   error?: string;
   deliveredToTelegram?: boolean;
   deliveredToWhatsapp?: boolean;
+  pictures?: { messageId: string; caption: string }[];
 };

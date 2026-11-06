@@ -1,10 +1,20 @@
+import type { WhatsappMessage } from "./types.js";
+
+export type SummaryPicture = {
+  messageId: string;
+  caption: string;
+};
+
 export type StructuredSummaryChat = {
   chatJid?: string;
   chatName: string;
   discussed: string[];
   conclusions: string[];
   actionItems: string[];
+  pictures: SummaryPicture[];
 };
+
+export type SelectedPicture = SummaryPicture & { filePath: string };
 
 export type StructuredSummary = {
   noActionRequiredText: string;
@@ -37,7 +47,15 @@ function readStringArray(value: unknown): string[] {
   return value.map(readString).filter(Boolean);
 }
 
-function escapeTelegramHtml(value: string): string {
+function readPictures(value: unknown): SummaryPicture[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({ messageId: readString(item.messageId), caption: readString(item.caption) }))
+    .filter((picture) => picture.messageId);
+}
+
+export function escapeTelegramHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -68,6 +86,7 @@ export function parseStructuredSummary(raw: string): StructuredSummary {
       discussed: readStringArray(item.discussed),
       conclusions: readStringArray(item.conclusions),
       actionItems: readStringArray(item.actionItems),
+      pictures: readPictures(item.pictures),
     }))
     .filter(
       (chat) =>
@@ -88,29 +107,54 @@ function renderBulletList(items: string[], marker: string): string[] {
   return items.map((item) => `${marker} ${escapeTelegramHtml(item)}`);
 }
 
+export function renderChatBlock(chat: StructuredSummaryChat, noActionRequiredText: string): string {
+  const lines = [`<b>${escapeTelegramHtml(chat.chatName)}</b>`];
+
+  lines.push("", "<b>Discussed</b>");
+  lines.push(...(chat.discussed.length > 0 ? renderBulletList(chat.discussed, "•") : ["• -"]));
+
+  lines.push("", "<b>Conclusions</b>");
+  lines.push(...(chat.conclusions.length > 0 ? renderBulletList(chat.conclusions, "•") : ["• -"]));
+
+  lines.push("", "<b>Action items</b>");
+  lines.push(
+    ...(chat.actionItems.length > 0
+      ? renderBulletList(chat.actionItems, "✅")
+      : [`✅ ${escapeTelegramHtml(noActionRequiredText)}`]),
+  );
+
+  return lines.join("\n");
+}
+
 export function renderStructuredSummary(summary: StructuredSummary): string {
   if (summary.chats.length === 0) {
     return escapeTelegramHtml(summary.emptySummaryText);
   }
 
-  const blocks = summary.chats.map((chat) => {
-    const lines = [`<b>${escapeTelegramHtml(chat.chatName)}</b>`];
+  return summary.chats
+    .map((chat) => renderChatBlock(chat, summary.noActionRequiredText))
+    .join("\n\n");
+}
 
-    lines.push("", "<b>Discussed</b>");
-    lines.push(...(chat.discussed.length > 0 ? renderBulletList(chat.discussed, "•") : ["• -"]));
+// The model may only pick real, still-stored pictures from the chat it is summarising.
+export function selectPictures(
+  chat: StructuredSummaryChat,
+  sendable: Map<string, WhatsappMessage>,
+): SelectedPicture[] {
+  const selected: SelectedPicture[] = [];
+  const seen = new Set<string>();
 
-    lines.push("", "<b>Conclusions</b>");
-    lines.push(...(chat.conclusions.length > 0 ? renderBulletList(chat.conclusions, "•") : ["• -"]));
+  for (const picture of chat.pictures) {
+    const message = sendable.get(picture.messageId);
+    if (!message?.sendablePicture || !message.pictureFilePath || seen.has(picture.messageId)) continue;
+    const sameChat = chat.chatJid
+      ? message.chatJid === chat.chatJid
+      : message.chatLabel === chat.chatName;
+    if (!sameChat) continue;
 
-    lines.push("", "<b>Action items</b>");
-    lines.push(
-      ...(chat.actionItems.length > 0
-        ? renderBulletList(chat.actionItems, "✅")
-        : [`✅ ${escapeTelegramHtml(summary.noActionRequiredText)}`]),
-    );
+    seen.add(picture.messageId);
+    selected.push({ ...picture, filePath: message.pictureFilePath });
+  }
 
-    return lines.join("\n");
-  });
-
-  return blocks.join("\n\n");
+  return selected;
 }

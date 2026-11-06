@@ -3,11 +3,19 @@ import { appLogger } from "../appLogger.js";
 import { loadMessages, markProcessed } from "./messageStore.js";
 import { buildPrompt } from "./promptBuilder.js";
 import { summarize } from "./llmClient.js";
-import { sendTelegramMessage } from "./telegramClient.js";
-import { sendWhatsappText, telegramHtmlToWhatsappText } from "../whatsappDelivery.js";
+import { sendTelegramMessage, sendTelegramPhoto } from "./telegramClient.js";
+import {
+  sendWhatsappImage,
+  sendWhatsappText,
+  telegramHtmlToWhatsappText,
+} from "../whatsappDelivery.js";
+import { deliverDigest, type DeliveryTarget } from "./digestDelivery.js";
 import type { DigestResult } from "./types.js";
 import { parseStructuredSummary, renderStructuredSummary } from "./structuredSummary.js";
 import { purgeOldMessages } from "./messageStore.js";
+import { ensureMediaProcessed } from "../media/mediaWorker.js";
+import { deleteMediaFile, getMediaItems } from "../media/mediaStore.js";
+import { applyMediaText } from "../media/mediaText.js";
 import { purgeOldSummaries, recordSummary } from "./summaryStore.js";
 import { getSettings, purgeOldMessageAnchors, recordEvent } from "../db/database.js";
 import {
@@ -75,10 +83,13 @@ export async function runDigest(): Promise<DigestResult> {
       retentionHours: config.messageRetentionHours,
     });
 
-    const messages = loadMessages(
+    const loadedMessages = loadMessages(
       Math.floor(from.getTime() / 1000),
       Math.floor(now.getTime() / 1000)
     );
+    const messageIds = loadedMessages.map((message) => message.messageId);
+    await ensureMediaProcessed(messageIds);
+    const messages = applyMediaText(loadedMessages, getMediaItems(messageIds));
 
     if (messages.length === 0) {
       appLogger.info("No new messages in window");
@@ -99,40 +110,74 @@ export async function runDigest(): Promise<DigestResult> {
 
     const prompt = buildPrompt(messages, from, now);
     const rawSummary = await summarize(prompt);
-    const summary = renderStructuredSummary(parseStructuredSummary(rawSummary));
+    const structured = parseStructuredSummary(rawSummary);
+    const summary = renderStructuredSummary(structured);
+
+    const targets: DeliveryTarget[] = [];
     if (settings.telegramEnabled) {
-      await sendTelegramMessage(summary);
+      targets.push({
+        name: "telegram",
+        sendText: (html) => sendTelegramMessage(html),
+        sendPhoto: (photo, caption) => sendTelegramPhoto(photo, caption),
+      });
     } else {
       recordEvent("info", "telegram.skipped", "Telegram delivery skipped because it is disabled");
     }
     if (settings.whatsappDeliveryEnabled) {
-      const result = await sendWhatsappText(
-        settings.whatsappDeliveryChatJid,
-        telegramHtmlToWhatsappText(summary),
-      );
-      recordEvent("info", "whatsapp.delivery_sent", "WhatsApp digest delivered", {
-        jid: result.jid,
-        messageId: result.messageId,
+      const jid = settings.whatsappDeliveryChatJid;
+      targets.push({
+        name: "whatsapp",
+        sendText: async (html) => {
+          await sendWhatsappText(jid, telegramHtmlToWhatsappText(html));
+        },
+        sendPhoto: async (photo, caption) => {
+          await sendWhatsappImage(jid, photo, caption);
+        },
       });
     } else {
       recordEvent("info", "whatsapp.delivery_skipped", "WhatsApp delivery skipped because it is disabled");
     }
-    markProcessed(messages.map((message) => message.messageId));
 
-    appLogger.info("Digest complete", { messageCount: messages.length });
+    const delivery = await deliverDigest(structured, messages, targets);
+    if (targets.length > 0 && structured.chats.length > 0 && delivery.deliveredChats === 0) {
+      throw new Error("Digest delivery failed for every chat");
+    }
+    if (settings.whatsappDeliveryEnabled) {
+      recordEvent("info", "whatsapp.delivery_sent", "WhatsApp digest delivered", {
+        jid: settings.whatsappDeliveryChatJid,
+      });
+    }
+
+    // Chats that failed stay unprocessed so the next digest retries them, pictures included.
+    const processed = delivery.unresolvedFailure
+      ? []
+      : messages.filter((message) => !delivery.failedChatJids.has(message.chatJid));
+    markProcessed(processed.map((message) => message.messageId));
+    for (const message of processed) {
+      if (message.messageType === "imageMessage") deleteMediaFile(message.messageId);
+    }
+
+    appLogger.info("Digest complete", {
+      messageCount: processed.length,
+      failedChats: delivery.failedChatJids.size,
+      pictures: delivery.sentPictures.length,
+    });
     recordEvent("info", "digest.complete", "Digest completed", {
-      messageCount: messages.length,
+      messageCount: processed.length,
+      failedChats: delivery.failedChatJids.size,
+      picturesSent: delivery.sentPictures.length,
       deliveredToTelegram: settings.telegramEnabled,
       deliveredToWhatsapp: settings.whatsappDeliveryEnabled,
     });
     const result: DigestResult = {
       status: "ok",
-      messageCount: messages.length,
+      messageCount: processed.length,
       from: from.toISOString(),
       to: now.toISOString(),
       summary,
       deliveredToTelegram: settings.telegramEnabled,
       deliveredToWhatsapp: settings.whatsappDeliveryEnabled,
+      pictures: delivery.sentPictures,
     };
     safeRecordSummary(result);
     markDigestFinished(result);
