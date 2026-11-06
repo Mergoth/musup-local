@@ -14,6 +14,6 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-silent}
       PORT: ${PORT:-8787}
       WHATSAPP_SYNC_FULL_HISTORY: ${WHATSAPP_SYNC_FULL_HISTORY:-false}
-    # Loopback only: the admin UI is plain HTTP, reach it with `./deploy.sh tunnel`.
+    # Loopback only: the admin UI is plain HTTP, reach it with `scripts/oracle/deploy.sh tunnel`.
     ports:
       - "127.0.0.1:${PORT:-8787}:${PORT:-8787}"

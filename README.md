@@ -137,12 +137,26 @@ docker compose up -d --build musup    # rebuild after code changes
 docker compose down                   # stop
 ```
 
+## Deploy to an Oracle Cloud VM
+
+`scripts/oracle/deploy.sh` builds the image locally, ships it over SSH and runs it on an Ubuntu VM (Oracle Cloud Always Free ARM by default). The admin UI is bound to loopback on the VM and reached through an SSH tunnel.
+
+```bash
+cp scripts/oracle/deploy.local.sh.example scripts/oracle/deploy.local.sh   # fill in host, user, SSH key
+scripts/oracle/deploy.sh setup    # once: install Docker and add swap
+scripts/oracle/deploy.sh          # build, ship, restart
+scripts/oracle/deploy.sh tunnel   # admin UI at http://localhost:8787
+scripts/oracle/deploy.sh logs
+```
+
+`.env` in the repo root is copied to the VM on each deploy.
+
 ## Storage layout
 
 | Path | Contents | Retention |
 |------|----------|-----------|
 | `data/musup.db` | Settings, chats, subscriptions, event log | permanent |
-| `data/messages/YYYY-MM-DD/HH.ndjson` | Raw message logs | 24 h |
+| `data/messages/YYYY-MM-DD/HH.ndjson` | Raw message logs | 24 h after summarisation, 7 days if never summarised (`SUMMARIZED_MESSAGE_RETENTION_HOURS`, `MESSAGE_RETENTION_HOURS`) |
 | `data/summaries/YYYY-MM-DD.ndjson` | Summary journal | 36 h |
 | `data/prompts/` | Custom prompt overrides | permanent |
 | `data/auth/` | WhatsApp session credentials. Cleared automatically when WhatsApp reports the session logged out so a fresh QR can be generated. | permanent until logout |

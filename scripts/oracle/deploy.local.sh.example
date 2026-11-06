@@ -1,4 +1,4 @@
-# Copy this file to deploy.local.sh and fill in your values.
+# Copy this file to scripts/oracle/deploy.local.sh and fill in your values.
 # deploy.local.sh is git-ignored — never commit it.
 
 # Oracle Ubuntu images log in as "ubuntu"; Oracle Linux images as "opc".

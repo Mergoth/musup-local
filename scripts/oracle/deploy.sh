@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Deploy musup to a VM (Oracle Cloud Always Free ARM by default).
-#   ./deploy.sh setup   one-time: install Docker on a fresh Ubuntu VM
-#   ./deploy.sh         build image, ship it, restart
-#   ./deploy.sh tunnel  open the admin UI at http://localhost:8787
-#   ./deploy.sh logs    last 100 log lines
-# Host settings live in deploy.local.sh (git-ignored).
+#   scripts/oracle/deploy.sh setup   one-time: install Docker on a fresh Ubuntu VM
+#   scripts/oracle/deploy.sh         build image, ship it, restart
+#   scripts/oracle/deploy.sh tunnel  open the admin UI at http://localhost:8787
+#   scripts/oracle/deploy.sh logs    last 100 log lines
+# Host settings live in scripts/oracle/deploy.local.sh (git-ignored); .env is read from the repo root.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 LOCAL_CONFIG="${SCRIPT_DIR}/deploy.local.sh"
 if [[ ! -f "$LOCAL_CONFIG" ]]; then
@@ -43,11 +44,11 @@ case "${1:-deploy}" in
         echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
       fi
       mkdir -p '${DEPLOY_DIR}/data'"
-    echo "Done. Run ./deploy.sh to deploy."
+    echo "Done. Run $0 to deploy."
     ;;
   deploy)
     echo "==> Building musup:latest for ${DEPLOY_PLATFORM}..."
-    docker build --platform "${DEPLOY_PLATFORM}" -t musup:latest "${SCRIPT_DIR}/musup"
+    docker build --platform "${DEPLOY_PLATFORM}" -t musup:latest "${REPO_ROOT}/musup"
 
     echo "==> Shipping image..."
     docker save musup:latest | gzip | remote "gzip -d | docker load"
@@ -55,8 +56,8 @@ case "${1:-deploy}" in
     echo "==> Syncing compose file and .env..."
     remote "mkdir -p '${DEPLOY_DIR}/data'"
     upload "${SCRIPT_DIR}/compose.prod.yml" "${DEPLOY_DIR}/compose.yml"
-    if [[ -f "${SCRIPT_DIR}/.env" ]]; then
-      upload "${SCRIPT_DIR}/.env" "${DEPLOY_DIR}/.env"
+    if [[ -f "${REPO_ROOT}/.env" ]]; then
+      upload "${REPO_ROOT}/.env" "${DEPLOY_DIR}/.env"
     else
       remote "touch '${DEPLOY_DIR}/.env'"
     fi
