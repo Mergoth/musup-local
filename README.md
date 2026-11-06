@@ -26,6 +26,7 @@ WhatsApp chats ──▶ musup (NAS / server / cloud VM) ──▶ LLM ──▶
 - ☁️ **Runs anywhere** — anything with Docker: Synology/QNAP, a Raspberry Pi, Oracle Cloud Always Free, any VPS
 - 🧠 **Any LLM** — OpenAI, Gemini, Ollama, or anything OpenAI-compatible
 - 🌍 **Any language** — summaries in your language, whatever the chat speaks
+- 🖼️ **Pictures & voice notes** — flyers and screenshots get described, voice notes transcribed; worthwhile pictures arrive with the digest
 - 🖥️ **Web UI** — link, pick chats, schedule, edit the prompt; no config files
 
 ## Install
@@ -54,7 +55,7 @@ scripts/oracle/deploy.sh tunnel   # UI at http://localhost:8787 via SSH
 ## Use
 
 1. **Whatsapp** → scan the QR in WhatsApp → *Linked Devices*, then subscribe the chats you care about.
-2. **Config** → LLM endpoint + API key and summary language.
+2. **Config** → LLM endpoint + API key and summary language. Optionally fill the **Vision** and **Transcription** tabs to read pictures and voice notes (e.g. Gemini via AI Studio: `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`; a URL ending in `/audio/transcriptions` uses Whisper-style APIs). "⇉ copy to all" reuses a value across the three.
 3. **Config** → digest times, e.g. `08:00`, `21:00` (local time).
 4. **Config** → Telegram bot token + chat IDs, and/or a WhatsApp delivery chat.
 5. **Config** → enable summarisation. Done — digests land in **Summaries** too.
