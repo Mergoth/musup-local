@@ -4,7 +4,13 @@ import { getSettings, recordEvent } from "../db/database.js";
 import { getModelConfig, isModelConfigured } from "../digest/llmClient.js";
 import { transcodeToMp3 } from "./ffmpeg.js";
 import { describeImage, transcribeAudio } from "./mediaModels.js";
-import { deleteMediaFile, getMediaItem, listMediaByStatus, updateMediaItem } from "./mediaStore.js";
+import {
+  deleteMediaFile,
+  getMediaItem,
+  listMediaByStatus,
+  purgeOrphanMediaFiles,
+  updateMediaItem,
+} from "./mediaStore.js";
 import type { MediaItem, MediaKind } from "./mediaTypes.js";
 
 export type WorkerDeps = {
@@ -104,6 +110,8 @@ export function enqueueMedia(messageId: string): void {
 }
 
 export function startMediaWorker(): void {
+  const orphans = purgeOrphanMediaFiles();
+  if (orphans > 0) appLogger.info("Removed orphan media files", { orphans });
   for (const item of listMediaByStatus(["pending"])) enqueueMedia(item.messageId);
 }
 

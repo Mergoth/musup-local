@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { appLogger } from "../appLogger.js";
 import type { WhatsappMessage } from "./types.js";
 import { getSubscribedChatJids } from "../db/database.js";
+import { purgeMediaItems } from "../media/mediaStore.js";
 
 const messagesDir = path.join(config.dataDir, "messages");
 const processedFile = path.join(config.dataDir, "processed.json");
@@ -287,10 +288,13 @@ export function purgeOldMessages(
     );
   }
 
-  if (deletedFiles > 0 || removedProcessed > 0) {
+  const purgedMedia = purgeMediaItems(retainedMessageIds);
+
+  if (deletedFiles > 0 || removedProcessed > 0 || purgedMedia > 0) {
     appLogger.info("Purged old message storage", {
       deletedFiles,
       removedProcessed,
+      purgedMedia,
       cutoff: new Date(cutoffMs).toISOString(),
     });
   }

@@ -57,3 +57,15 @@ test("purgeMediaItems keeps only retained messages", () => {
   assert.equal(fs.existsSync(filePath), false);
   assert.ok(store.getMediaItem("keep"));
 });
+
+test("orphan media files without a record are removed", () => {
+  fs.mkdirSync(store.mediaDir(), { recursive: true });
+  const orphan = path.join(store.mediaDir(), "orphan.jpg");
+  const owned = path.join(store.mediaDir(), "owned.jpg");
+  fs.writeFileSync(orphan, "x");
+  fs.writeFileSync(owned, "x");
+  store.upsertMediaItem({ ...base, messageId: "owned", filePath: owned });
+  assert.equal(store.purgeOrphanMediaFiles(), 1);
+  assert.equal(fs.existsSync(orphan), false);
+  assert.equal(fs.existsSync(owned), true);
+});

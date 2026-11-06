@@ -126,3 +126,21 @@ export function purgeMediaItems(keepMessageIds: Set<string>): number {
   saveDb();
   return stale.length;
 }
+
+// Files left behind by a crash between download and bookkeeping.
+export function purgeOrphanMediaFiles(): number {
+  if (!fs.existsSync(mediaDir())) return 0;
+  const owned = new Set(
+    allRows("select file_path from media_items where file_path is not null").map((row) =>
+      path.resolve(String(row.file_path)),
+    ),
+  );
+  let removed = 0;
+  for (const file of fs.readdirSync(mediaDir())) {
+    const filePath = path.resolve(mediaDir(), file);
+    if (owned.has(filePath)) continue;
+    removeFile(filePath);
+    removed += 1;
+  }
+  return removed;
+}
