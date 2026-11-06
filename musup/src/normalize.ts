@@ -1,4 +1,13 @@
 import { normalizeMessageContent, type WAMessage } from "@whiskeysockets/baileys";
+import type { MediaKind } from "./media/mediaTypes.js";
+
+export type MediaInfo = {
+  kind: MediaKind;
+  mimeType: string;
+  viewOnce: boolean;
+  fileLength?: number;
+  seconds?: number;
+};
 
 export type NormalizedMessage = {
   messageId: string;
@@ -8,6 +17,7 @@ export type NormalizedMessage = {
   timestamp: number;
   messageType: string;
   text?: string;
+  media?: MediaInfo;
 };
 
 type BaileysMessage = NonNullable<WAMessage["message"]>;
@@ -46,6 +56,46 @@ export function extractText(message: WAMessage): string | undefined {
   );
 }
 
+function optionalNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined) return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+}
+
+// Pictures and push-to-talk voice notes; everything else stays out of scope.
+export function classifyMedia(message: WAMessage): MediaInfo | undefined {
+  const raw = message.message;
+  const msg = normalizeMessageContent(raw);
+  if (!raw || !msg) return undefined;
+
+  // normalizeMessageContent unwraps view-once, so check the raw wrapper.
+  const viewOnce = Boolean(
+    raw.viewOnceMessage || raw.viewOnceMessageV2 || raw.viewOnceMessageV2Extension,
+  );
+
+  if (msg.imageMessage) {
+    return {
+      kind: "picture",
+      mimeType: msg.imageMessage.mimetype || "image/jpeg",
+      viewOnce,
+      fileLength: optionalNumber(msg.imageMessage.fileLength),
+      seconds: undefined,
+    };
+  }
+
+  if (msg.audioMessage?.ptt) {
+    return {
+      kind: "voice",
+      mimeType: msg.audioMessage.mimetype || "audio/ogg",
+      viewOnce,
+      fileLength: optionalNumber(msg.audioMessage.fileLength),
+      seconds: optionalNumber(msg.audioMessage.seconds),
+    };
+  }
+
+  return undefined;
+}
+
 export function normalizeMessage(message: WAMessage): NormalizedMessage | null {
   const key = message.key;
 
@@ -67,5 +117,6 @@ export function normalizeMessage(message: WAMessage): NormalizedMessage | null {
         : Number(message.messageTimestamp || 0),
     messageType,
     text: extractText(message),
+    media: classifyMedia(message),
   };
 }

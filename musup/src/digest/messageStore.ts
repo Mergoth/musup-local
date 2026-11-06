@@ -36,8 +36,11 @@ function parseMessageLine(
     const chatJid = typeof node.chatJid === "string" ? node.chatJid : "";
     const timestamp = typeof node.timestamp === "number" ? node.timestamp : 0;
     const text = typeof node.text === "string" ? node.text.trim() : "";
+    const messageType = typeof node.messageType === "string" ? node.messageType : "unknown";
+    // Pictures and voice notes may have no text; their content comes from media_items.
+    const isMedia = messageType === "imageMessage" || messageType === "audioMessage";
 
-    if (!messageId || !chatJid || !timestamp || !text) return null;
+    if (!messageId || !chatJid || !timestamp || (!text && !isMedia)) return null;
 
     return {
       messageId,
@@ -46,7 +49,7 @@ function parseMessageLine(
       senderJid: typeof node.senderJid === "string" ? node.senderJid : undefined,
       fromMe: Boolean(node.fromMe),
       timestamp,
-      messageType: typeof node.messageType === "string" ? node.messageType : "unknown",
+      messageType,
       text,
     };
   } catch (err) {
