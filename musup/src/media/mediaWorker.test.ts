@@ -97,3 +97,25 @@ test("missing file marks the media unavailable", async () => {
   await processMediaItem("gone1", unused);
   assert.equal(store.getMediaItem("gone1")?.status, "unavailable");
 });
+
+test("a picture still downloading is left alone at digest time", async () => {
+  store.upsertMediaItem({ messageId: "dl1", chatJid: "a@g.us", kind: "picture", status: "downloading", mimeType: "image/jpeg" });
+  await ensureMediaProcessed(["dl1"], 1000, unused);
+  assert.equal(store.getMediaItem("dl1")?.status, "downloading");
+});
+
+test("digest-time catch-up stops at its overall budget", async () => {
+  for (const id of ["b1", "b2", "b3"]) addItem(id, "picture");
+  let calls = 0;
+  const hung = { ...unused, describeImage: () => { calls += 1; return new Promise<string>(() => {}); } };
+  await ensureMediaProcessed(["b1", "b2", "b3"], 50, hung, 80);
+  assert.ok(calls <= 2, `expected at most 2 attempts, got ${calls}`);
+  assert.equal(store.getMediaItem("b3")?.status, "pending");
+});
+
+test("leftover downloads from a crash become unavailable on start", async () => {
+  const { startMediaWorker } = await import("./mediaWorker.js");
+  store.upsertMediaItem({ messageId: "crash1", chatJid: "a@g.us", kind: "voice", status: "downloading", mimeType: "audio/ogg" });
+  startMediaWorker();
+  assert.equal(store.getMediaItem("crash1")?.status, "unavailable");
+});

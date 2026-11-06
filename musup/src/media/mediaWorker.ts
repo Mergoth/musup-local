@@ -12,6 +12,7 @@ import {
   updateMediaItem,
 } from "./mediaStore.js";
 import type { MediaItem, MediaKind } from "./mediaTypes.js";
+import { withTimeout } from "./timeout.js";
 
 export type WorkerDeps = {
   describeImage: typeof describeImage;
@@ -22,18 +23,11 @@ export type WorkerDeps = {
 const defaultDeps: WorkerDeps = { describeImage, transcribeAudio, transcodeToMp3 };
 const BACKGROUND_TIMEOUT_MS = 120_000;
 const MAX_ATTEMPTS = 2;
+const DIGEST_BUDGET_MS = 120_000;
 
 const inFlight = new Map<string, Promise<MediaItem | undefined>>();
 const notConfiguredReported = new Set<MediaKind>();
 let queue: Promise<unknown> = Promise.resolve();
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Timed out after ${timeoutMs} ms`)), timeoutMs);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
 
 async function runModel(item: MediaItem, filePath: string, deps: WorkerDeps, timeoutMs: number): Promise<string> {
   const settings = getSettings();
@@ -110,18 +104,30 @@ export function enqueueMedia(messageId: string): void {
 }
 
 export function startMediaWorker(): void {
+  // A download interrupted by a restart can't be resumed: the WhatsApp message is gone.
+  for (const item of listMediaByStatus(["downloading"])) {
+    updateMediaItem(item.messageId, { status: "unavailable", error: "Interrupted by restart" });
+  }
   const orphans = purgeOrphanMediaFiles();
   if (orphans > 0) appLogger.info("Removed orphan media files", { orphans });
   for (const item of listMediaByStatus(["pending"])) enqueueMedia(item.messageId);
 }
 
-// Digest-time catch-up: one more try for anything not done yet. Never throws.
+// Digest-time catch-up: one more try for anything not done yet, within one overall budget
+// so a slow model can't make the digest late. Never throws.
 export async function ensureMediaProcessed(
   messageIds: string[],
   timeoutMs = 60_000,
   deps: WorkerDeps = defaultDeps,
+  budgetMs = DIGEST_BUDGET_MS,
 ): Promise<void> {
+  const deadline = Date.now() + budgetMs;
   for (const messageId of messageIds) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      appLogger.warn("Digest-time media catch-up ran out of time", { budgetMs });
+      return;
+    }
     const item = getMediaItem(messageId);
     if (!item) continue;
     const retry =
@@ -131,7 +137,8 @@ export async function ensureMediaProcessed(
     if (!retry) continue;
 
     try {
-      await withTimeout(processMediaItem(messageId, deps, { timeoutMs }), timeoutMs + 1_000);
+      const itemTimeoutMs = Math.min(timeoutMs, remaining);
+      await withTimeout(processMediaItem(messageId, deps, { timeoutMs: itemTimeoutMs }), itemTimeoutMs + 1_000);
     } catch (err) {
       appLogger.warn("Digest-time media processing gave up", { messageId, err });
     }

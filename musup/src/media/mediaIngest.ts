@@ -6,8 +6,18 @@ import { recordEvent } from "../db/database.js";
 import type { NormalizedMessage } from "../normalize.js";
 import { mediaDir, updateMediaItem, upsertMediaItem } from "./mediaStore.js";
 import { MAX_PICTURE_BYTES, MAX_VOICE_SECONDS } from "./mediaTypes.js";
+import { withTimeout } from "./timeout.js";
 
 export type MediaDownloader = (message: WAMessage) => Promise<Buffer>;
+
+// Baileys' download (and its re-upload request for expired media) has no timeout of its own.
+const DOWNLOAD_TIMEOUT_MS = 60_000;
+let downloads: Promise<unknown> = Promise.resolve();
+
+// Message ids come from the sender; keep them from steering the file path.
+function safeFileName(messageId: string): string {
+  return messageId.replace(/[^A-Za-z0-9_-]/g, "_") || "media";
+}
 
 function extensionFor(mimeType: string): string {
   const type = mimeType.split(";")[0]?.trim().toLowerCase() || "";
@@ -23,6 +33,7 @@ export async function ingestMedia(
   message: WAMessage,
   normalized: NormalizedMessage,
   download: MediaDownloader,
+  opts: { timeoutMs?: number } = {},
 ): Promise<boolean> {
   const media = normalized.media;
   if (!media) return false;
@@ -48,14 +59,17 @@ export async function ingestMedia(
     return false;
   }
 
-  if (!upsertMediaItem({ ...base, status: "pending" })) return false;
+  if (!upsertMediaItem({ ...base, status: "downloading" })) return false;
 
   try {
-    const data = await download(message);
+    const data = await withTimeout(download(message), opts.timeoutMs ?? DOWNLOAD_TIMEOUT_MS);
     fs.mkdirSync(mediaDir(), { recursive: true });
-    const filePath = path.join(mediaDir(), `${normalized.messageId}.${extensionFor(media.mimeType)}`);
+    const filePath = path.join(
+      mediaDir(),
+      `${safeFileName(normalized.messageId)}.${extensionFor(media.mimeType)}`,
+    );
     fs.writeFileSync(filePath, data);
-    updateMediaItem(normalized.messageId, { filePath });
+    updateMediaItem(normalized.messageId, { status: "pending", filePath });
     return true;
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
@@ -69,4 +83,18 @@ export async function ingestMedia(
     });
     return false;
   }
+}
+
+// Downloads run one at a time in the background so media never holds up saving messages.
+export function scheduleMediaIngest(
+  message: WAMessage,
+  normalized: NormalizedMessage,
+  download: MediaDownloader,
+  onReady: (messageId: string) => void,
+): void {
+  downloads = downloads
+    .then(async () => {
+      if (await ingestMedia(message, normalized, download)) onReady(normalized.messageId);
+    })
+    .catch((err) => appLogger.error("Failed to ingest media", { err, messageId: normalized.messageId }));
 }

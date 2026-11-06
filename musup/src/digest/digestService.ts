@@ -149,7 +149,9 @@ export async function runDigest(): Promise<DigestResult> {
     }
 
     // Chats that failed stay unprocessed so the next digest retries them, pictures included.
-    const processed = messages.filter((message) => !delivery.failedChatJids.has(message.chatJid));
+    const processed = delivery.unresolvedFailure
+      ? []
+      : messages.filter((message) => !delivery.failedChatJids.has(message.chatJid));
     markProcessed(processed.map((message) => message.messageId));
     for (const message of processed) {
       if (message.messageType === "imageMessage") deleteMediaFile(message.messageId);

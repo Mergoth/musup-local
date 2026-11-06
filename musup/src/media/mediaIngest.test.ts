@@ -61,3 +61,28 @@ test("a failed download marks the media unavailable", async () => {
   assert.equal(await ingestMedia(raw, normalized("x1", picture), download), false);
   assert.equal(getMediaItem("x1")?.status, "unavailable");
 });
+
+test("a hung download gives up and marks the media unavailable", async () => {
+  const hung = () => new Promise<Buffer>(() => {});
+  await ingestMedia(raw, normalized("hang", picture), hung, { timeoutMs: 50 });
+  assert.equal(getMediaItem("hang")?.status, "unavailable");
+});
+
+test("media is 'downloading' until its file is written", async () => {
+  let release!: (b: Buffer) => void;
+  const slow = () => new Promise<Buffer>((resolve) => (release = resolve));
+  const running = ingestMedia(raw, normalized("slow", picture), slow);
+  await new Promise((r) => setImmediate(r));
+  assert.equal(getMediaItem("slow")?.status, "downloading");
+  release(Buffer.from("img"));
+  await running;
+  assert.equal(getMediaItem("slow")?.status, "pending");
+});
+
+test("a crafted message id cannot write outside the media folder", async () => {
+  const { mediaDir } = await import("./mediaStore.js");
+  await ingestMedia(raw, normalized("../../escape", picture), async () => Buffer.from("x"));
+  const filePath = getMediaItem("../../escape")?.filePath;
+  assert.ok(filePath);
+  assert.equal(path.dirname(path.resolve(filePath!)), path.resolve(mediaDir()));
+});

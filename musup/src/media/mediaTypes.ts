@@ -1,6 +1,7 @@
 export type MediaKind = "picture" | "voice";
 
 export type MediaStatus =
+  | "downloading"
   | "pending"
   | "done"
   | "failed"

@@ -99,3 +99,16 @@ test("an empty summary is sent once as plain text", async () => {
   await deliverDigest({ ...summary, chats: [] }, messages, [target], readFile);
   assert.deepEqual(log, ["text:Nothing new"]);
 });
+
+test("a failed chat the model mislabelled blocks marking anything processed", async () => {
+  const bogus = { ...summary, chats: [{ ...summary.chats[0]!, chatJid: "typo@g.us", chatName: "Clase 2B" }] };
+  const { target } = recorder("telegram", () => true);
+  const result = await deliverDigest(bogus, messages, [target], readFile);
+  assert.equal(result.unresolvedFailure, true);
+});
+
+test("a failed chat with a valid jid is resolved normally", async () => {
+  const { target } = recorder("telegram", (text) => text.startsWith("<b>2B</b>"));
+  const result = await deliverDigest(summary, messages, [target], readFile);
+  assert.equal(result.unresolvedFailure, false);
+});
