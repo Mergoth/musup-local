@@ -1,9 +1,18 @@
 import { spawn } from "child_process";
+import ffmpegStatic from "ffmpeg-static";
+
+// Its CommonJS typings don't describe the default import; at runtime it is the binary path.
+const ffmpegPath = ffmpegStatic as unknown as string | null;
+
+// The npm package ships a static binary for the platform it was installed on.
+export function ffmpegBinary(): string {
+  return ffmpegPath || "ffmpeg";
+}
 
 // WhatsApp voice notes are Ogg/Opus; model APIs reliably accept MP3.
 export function transcodeToMp3(input: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("ffmpeg", [
+    const proc = spawn(ffmpegBinary(), [
       "-hide_banner", "-loglevel", "error",
       "-i", "pipe:0",
       "-ac", "1", "-ar", "16000", "-b:a", "32k",
