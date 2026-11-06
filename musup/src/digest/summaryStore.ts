@@ -14,6 +14,7 @@ export type StoredSummary = {
   error: string | null;
   deliveredToTelegram: boolean;
   deliveredToWhatsapp: boolean;
+  pictures: { messageId: string; caption: string }[];
 };
 
 export type SummaryInput = {
@@ -26,6 +27,7 @@ export type SummaryInput = {
   error?: string | null;
   deliveredToTelegram?: boolean;
   deliveredToWhatsapp?: boolean;
+  pictures?: { messageId: string; caption: string }[];
 };
 
 const summariesDir = path.join(config.dataDir, "summaries");
@@ -56,6 +58,14 @@ function parseSummaryLine(line: string): StoredSummary | null {
       error: typeof node.error === "string" ? node.error : null,
       deliveredToTelegram: Boolean(node.deliveredToTelegram),
       deliveredToWhatsapp: Boolean(node.deliveredToWhatsapp),
+      pictures: Array.isArray(node.pictures)
+        ? (node.pictures as Array<Record<string, unknown>>)
+            .filter((item) => item && typeof item.messageId === "string")
+            .map((item) => ({
+              messageId: String(item.messageId),
+              caption: typeof item.caption === "string" ? item.caption : "",
+            }))
+        : [],
     };
   } catch {
     return null;
@@ -85,6 +95,7 @@ export function recordSummary(input: SummaryInput): StoredSummary {
     error: input.error || null,
     deliveredToTelegram: Boolean(input.deliveredToTelegram),
     deliveredToWhatsapp: Boolean(input.deliveredToWhatsapp),
+    pictures: input.pictures || [],
   };
 
   fs.mkdirSync(summariesDir, { recursive: true });

@@ -55,7 +55,7 @@ function readPictures(value: unknown): SummaryPicture[] {
     .filter((picture) => picture.messageId);
 }
 
-function escapeTelegramHtml(value: string): string {
+export function escapeTelegramHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -107,31 +107,33 @@ function renderBulletList(items: string[], marker: string): string[] {
   return items.map((item) => `${marker} ${escapeTelegramHtml(item)}`);
 }
 
+export function renderChatBlock(chat: StructuredSummaryChat, noActionRequiredText: string): string {
+  const lines = [`<b>${escapeTelegramHtml(chat.chatName)}</b>`];
+
+  lines.push("", "<b>Discussed</b>");
+  lines.push(...(chat.discussed.length > 0 ? renderBulletList(chat.discussed, "•") : ["• -"]));
+
+  lines.push("", "<b>Conclusions</b>");
+  lines.push(...(chat.conclusions.length > 0 ? renderBulletList(chat.conclusions, "•") : ["• -"]));
+
+  lines.push("", "<b>Action items</b>");
+  lines.push(
+    ...(chat.actionItems.length > 0
+      ? renderBulletList(chat.actionItems, "✅")
+      : [`✅ ${escapeTelegramHtml(noActionRequiredText)}`]),
+  );
+
+  return lines.join("\n");
+}
+
 export function renderStructuredSummary(summary: StructuredSummary): string {
   if (summary.chats.length === 0) {
     return escapeTelegramHtml(summary.emptySummaryText);
   }
 
-  const blocks = summary.chats.map((chat) => {
-    const lines = [`<b>${escapeTelegramHtml(chat.chatName)}</b>`];
-
-    lines.push("", "<b>Discussed</b>");
-    lines.push(...(chat.discussed.length > 0 ? renderBulletList(chat.discussed, "•") : ["• -"]));
-
-    lines.push("", "<b>Conclusions</b>");
-    lines.push(...(chat.conclusions.length > 0 ? renderBulletList(chat.conclusions, "•") : ["• -"]));
-
-    lines.push("", "<b>Action items</b>");
-    lines.push(
-      ...(chat.actionItems.length > 0
-        ? renderBulletList(chat.actionItems, "✅")
-        : [`✅ ${escapeTelegramHtml(summary.noActionRequiredText)}`]),
-    );
-
-    return lines.join("\n");
-  });
-
-  return blocks.join("\n\n");
+  return summary.chats
+    .map((chat) => renderChatBlock(chat, summary.noActionRequiredText))
+    .join("\n\n");
 }
 
 // The model may only pick real, still-stored pictures from the chat it is summarising.

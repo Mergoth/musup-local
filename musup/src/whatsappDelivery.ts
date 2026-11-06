@@ -3,9 +3,11 @@ export type WhatsappDeliveryResult = {
   messageId?: string;
 };
 
+export type WhatsappDeliveryPayload = { text: string } | { image: Buffer; caption: string };
+
 export type WhatsappDeliveryHandler = (
   jid: string,
-  text: string,
+  payload: WhatsappDeliveryPayload,
 ) => Promise<WhatsappDeliveryResult>;
 
 let handler: WhatsappDeliveryHandler | undefined;
@@ -28,7 +30,22 @@ export async function sendWhatsappText(
     throw new Error("WhatsApp delivery text is empty");
   }
 
-  return handler(jid, text);
+  return handler(jid, { text });
+}
+
+export async function sendWhatsappImage(
+  jid: string,
+  image: Buffer,
+  caption: string,
+): Promise<WhatsappDeliveryResult> {
+  if (!handler) {
+    throw new Error("WhatsApp delivery is not ready yet");
+  }
+  if (!jid) {
+    throw new Error("WhatsApp delivery target is not configured");
+  }
+
+  return handler(jid, { image, caption });
 }
 
 export function telegramHtmlToWhatsappText(text: string): string {

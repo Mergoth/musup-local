@@ -23,4 +23,5 @@ export type DigestResult = {
   error?: string;
   deliveredToTelegram?: boolean;
   deliveredToWhatsapp?: boolean;
+  pictures?: { messageId: string; caption: string }[];
 };

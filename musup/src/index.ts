@@ -238,8 +238,8 @@ async function startCollector() {
   const downloadMedia: MediaDownloader = (message) =>
     downloadMediaMessage(message, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
 
-  configureWhatsappDeliveryHandler(async (jid, text) => {
-    const result = await sock.sendMessage(jid, { text });
+  configureWhatsappDeliveryHandler(async (jid, payload) => {
+    const result = await sock.sendMessage(jid, payload);
     return {
       jid,
       messageId: result?.key?.id || undefined,
