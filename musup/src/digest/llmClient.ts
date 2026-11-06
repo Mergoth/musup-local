@@ -1,5 +1,5 @@
 import { appLogger } from "../appLogger.js";
-import { getSettings } from "../db/database.js";
+import { getSettings, type AppSettings } from "../db/database.js";
 
 export type LlmConnectionConfig = {
   llmApiUrl: string;
@@ -7,7 +7,46 @@ export type LlmConnectionConfig = {
   llmApiKey: string;
 };
 
-async function chatCompletion(prompt: string, settings: LlmConnectionConfig): Promise<string> {
+export type ModelTarget = "digest" | "vision" | "transcription";
+
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "input_audio"; input_audio: { data: string; format: string } };
+
+export type ChatCompletionOptions = {
+  timeoutMs?: number;
+  // Transcribing silence legitimately yields no text.
+  allowEmpty?: boolean;
+};
+
+export function getModelConfig(settings: AppSettings, target: ModelTarget): LlmConnectionConfig {
+  if (target === "vision") {
+    return {
+      llmApiUrl: settings.visionApiUrl,
+      llmModel: settings.visionModel,
+      llmApiKey: settings.visionApiKey,
+    };
+  }
+  if (target === "transcription") {
+    return {
+      llmApiUrl: settings.transcriptionApiUrl,
+      llmModel: settings.transcriptionModel,
+      llmApiKey: settings.transcriptionApiKey,
+    };
+  }
+  return { llmApiUrl: settings.llmApiUrl, llmModel: settings.llmModel, llmApiKey: settings.llmApiKey };
+}
+
+export function isModelConfigured(cfg: LlmConnectionConfig): boolean {
+  return Boolean(cfg.llmApiUrl && cfg.llmModel && cfg.llmApiKey);
+}
+
+export async function chatCompletion(
+  content: string | ContentPart[],
+  settings: LlmConnectionConfig,
+  options: ChatCompletionOptions = {},
+): Promise<string> {
   if (!settings.llmApiKey) {
     throw new Error("LLM API key is not configured");
   }
@@ -20,7 +59,8 @@ async function chatCompletion(prompt: string, settings: LlmConnectionConfig): Pr
 
   appLogger.info("Sending prompt to LLM", {
     model: settings.llmModel,
-    length: prompt.length,
+    length: typeof content === "string" ? content.length : undefined,
+    parts: typeof content === "string" ? undefined : content.map((part) => part.type),
   });
 
   const response = await fetch(settings.llmApiUrl, {
@@ -31,10 +71,11 @@ async function chatCompletion(prompt: string, settings: LlmConnectionConfig): Pr
     },
     body: JSON.stringify({
       model: settings.llmModel,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content }],
       max_tokens: 4096,
       temperature: 0.2,
     }),
+    signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
   });
 
   const body = await response.text();
@@ -49,7 +90,7 @@ async function chatCompletion(prompt: string, settings: LlmConnectionConfig): Pr
   };
   const text = json.choices?.[0]?.message?.content?.trim() || "";
 
-  if (!text) {
+  if (!text && !options.allowEmpty) {
     appLogger.error("LLM response missing content", body);
     throw new Error(`LLM response does not contain text: ${body}`);
   }
@@ -61,24 +102,4 @@ async function chatCompletion(prompt: string, settings: LlmConnectionConfig): Pr
 export async function summarize(prompt: string): Promise<string> {
   const settings = getSettings();
   return chatCompletion(prompt, settings);
-}
-
-export async function testLlmConnection(settings: LlmConnectionConfig): Promise<{
-  ok: true;
-  latencyMs: number;
-  model: string;
-  text: string;
-}> {
-  const startedAt = Date.now();
-  const text = await chatCompletion(
-    'Reply with exactly this text: musup-local-ok',
-    settings
-  );
-
-  return {
-    ok: true,
-    latencyMs: Date.now() - startedAt,
-    model: settings.llmModel,
-    text,
-  };
 }

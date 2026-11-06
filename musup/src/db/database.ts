@@ -16,6 +16,12 @@ export type AppSettings = {
   llmApiUrl: string;
   llmModel: string;
   llmApiKey: string;
+  visionApiUrl: string;
+  visionModel: string;
+  visionApiKey: string;
+  transcriptionApiUrl: string;
+  transcriptionModel: string;
+  transcriptionApiKey: string;
   telegramBotToken: string;
   telegramChatIds: string[];
 };
@@ -237,6 +243,12 @@ export async function initDatabase(): Promise<void> {
   seedSetting("llmApiUrl", config.llmApiUrl);
   seedSetting("llmModel", config.llmModel);
   seedSetting("llmApiKey", config.llmApiKey);
+  seedSetting("visionApiUrl", "");
+  seedSetting("visionModel", "");
+  seedSetting("visionApiKey", "");
+  seedSetting("transcriptionApiUrl", "");
+  seedSetting("transcriptionModel", "");
+  seedSetting("transcriptionApiKey", "");
   seedSetting("telegramBotToken", config.telegramBotToken || "");
   seedSetting("telegramChatIds", JSON.stringify(config.telegramChatIds));
   if (shouldResetScheduleForTimezone) {
@@ -261,6 +273,12 @@ export function getSettings(): AppSettings {
     llmApiUrl: getSetting("llmApiUrl") || config.llmApiUrl,
     llmModel: getSetting("llmModel") || config.llmModel,
     llmApiKey: getSetting("llmApiKey") || "",
+    visionApiUrl: getSetting("visionApiUrl") || "",
+    visionModel: getSetting("visionModel") || "",
+    visionApiKey: getSetting("visionApiKey") || "",
+    transcriptionApiUrl: getSetting("transcriptionApiUrl") || "",
+    transcriptionModel: getSetting("transcriptionModel") || "",
+    transcriptionApiKey: getSetting("transcriptionApiKey") || "",
     telegramBotToken: getSetting("telegramBotToken") || "",
     telegramChatIds: parseJsonArray(getSetting("telegramChatIds")),
   };
@@ -307,6 +325,12 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   if (typeof patch.llmApiUrl === "string") setSettingValue("llmApiUrl", patch.llmApiUrl);
   if (typeof patch.llmModel === "string") setSettingValue("llmModel", patch.llmModel);
   if (typeof patch.llmApiKey === "string") setSettingValue("llmApiKey", patch.llmApiKey);
+  if (typeof patch.visionApiUrl === "string") setSettingValue("visionApiUrl", patch.visionApiUrl);
+  if (typeof patch.visionModel === "string") setSettingValue("visionModel", patch.visionModel);
+  if (typeof patch.visionApiKey === "string") setSettingValue("visionApiKey", patch.visionApiKey);
+  if (typeof patch.transcriptionApiUrl === "string") setSettingValue("transcriptionApiUrl", patch.transcriptionApiUrl);
+  if (typeof patch.transcriptionModel === "string") setSettingValue("transcriptionModel", patch.transcriptionModel);
+  if (typeof patch.transcriptionApiKey === "string") setSettingValue("transcriptionApiKey", patch.transcriptionApiKey);
   if (typeof patch.telegramBotToken === "string") {
     setSettingValue("telegramBotToken", patch.telegramBotToken);
   }

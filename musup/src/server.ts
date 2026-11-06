@@ -29,7 +29,8 @@ import { listSummaries, purgeOldSummaries } from "./digest/summaryStore.js";
 import { listBackfillRequests, requestChatBackfill } from "./whatsappBackfill.js";
 import { testWhatsappDelivery } from "./whatsappDelivery.js";
 import { refreshDigestScheduler } from "./digest/scheduler.js";
-import { testLlmConnection, type LlmConnectionConfig } from "./digest/llmClient.js";
+import type { LlmConnectionConfig, ModelTarget } from "./digest/llmClient.js";
+import { testModel } from "./media/mediaModels.js";
 import {
   testTelegramConnection,
   type TelegramConnectionConfig,
@@ -135,6 +136,12 @@ function cleanSettingsPatch(input: unknown): Partial<AppSettings> {
   if (typeof raw.llmApiUrl === "string") patch.llmApiUrl = raw.llmApiUrl;
   if (typeof raw.llmModel === "string") patch.llmModel = raw.llmModel;
   if (typeof raw.llmApiKey === "string") patch.llmApiKey = raw.llmApiKey;
+  if (typeof raw.visionApiUrl === "string") patch.visionApiUrl = raw.visionApiUrl;
+  if (typeof raw.visionModel === "string") patch.visionModel = raw.visionModel;
+  if (typeof raw.visionApiKey === "string") patch.visionApiKey = raw.visionApiKey;
+  if (typeof raw.transcriptionApiUrl === "string") patch.transcriptionApiUrl = raw.transcriptionApiUrl;
+  if (typeof raw.transcriptionModel === "string") patch.transcriptionModel = raw.transcriptionModel;
+  if (typeof raw.transcriptionApiKey === "string") patch.transcriptionApiKey = raw.transcriptionApiKey;
   if (typeof raw.telegramBotToken === "string") {
     patch.telegramBotToken = raw.telegramBotToken;
   }
@@ -145,6 +152,11 @@ function cleanSettingsPatch(input: unknown): Partial<AppSettings> {
   }
 
   return patch;
+}
+
+function cleanModelTarget(input: unknown): ModelTarget {
+  const target = input && typeof input === "object" ? (input as Record<string, unknown>).target : undefined;
+  return target === "vision" || target === "transcription" ? target : "digest";
 }
 
 function cleanLlmTestConfig(input: unknown): LlmConnectionConfig {
@@ -435,9 +447,13 @@ export function startServer(): http.Server {
     }
 
     if (req.method === "POST" && url.pathname === "/api/settings/test-llm") {
+      let target: ModelTarget = "digest";
       try {
-        const result = await testLlmConnection(cleanLlmTestConfig(await readJsonBody(req)));
+        const body = await readJsonBody(req);
+        target = cleanModelTarget(body);
+        const result = await testModel(target, cleanLlmTestConfig(body));
         recordEvent("info", "settings.llm_test", "LLM test succeeded", {
+          target,
           model: result.model,
           latencyMs: result.latencyMs,
         });
@@ -445,6 +461,7 @@ export function startServer(): http.Server {
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         recordEvent("warn", "settings.llm_test_failed", "LLM test failed", {
+          target,
           error: error.message,
         });
         sendJson(res, 400, {
