@@ -731,6 +731,74 @@ label {
   color: var(--muted);
 }
 
+.model-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.model-tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.model-tab.active {
+  color: var(--ink);
+  background: var(--surface-strong);
+  box-shadow: 0 1px 3px rgba(29, 40, 36, 0.12);
+}
+
+.model-tab-hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+.input-with-action {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.input-with-action input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.copy-to-all {
+  flex: 0 0 auto;
+  min-height: var(--control-height);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .model-tab {
+    padding: 0 4px;
+    font-size: 13px;
+  }
+
+  .copy-to-all {
+    padding: 0 10px;
+    font-size: 0;
+  }
+
+  .copy-to-all::before {
+    content: "⇉";
+    font-size: 16px;
+  }
+}
+
 input,
 textarea,
 select,
