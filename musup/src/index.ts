@@ -39,6 +39,7 @@ import { configureBackfillHandler, recordBackfillHistory } from "./whatsappBackf
 import { configureWhatsappDeliveryHandler } from "./whatsappDelivery.js";
 import type { NormalizedMessage } from "./normalize.js";
 import { ingestMedia, type MediaDownloader } from "./media/mediaIngest.js";
+import { enqueueMedia, startMediaWorker } from "./media/mediaWorker.js";
 
 type MessageSource = "live" | "history";
 
@@ -140,7 +141,7 @@ async function saveNormalizedMessage(
 
     if (normalized.media) {
       try {
-        await ingestMedia(message, normalized, download);
+        if (await ingestMedia(message, normalized, download)) enqueueMedia(normalized.messageId);
       } catch (err) {
         appLogger.error("Failed to ingest media", { err, messageId: normalized.messageId });
       }
@@ -350,6 +351,7 @@ async function startCollector() {
 await initDatabase();
 ensurePromptTemplates();
 purgeOldMessages();
+startMediaWorker();
 purgeOldSummaries();
 purgeOldMessageAnchors();
 recordEvent("info", "app.start", "musup-local app started");
