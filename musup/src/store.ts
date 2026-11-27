@@ -54,6 +54,7 @@ export function appendMessage(
     chatJid: normalized.chatJid,
     chatName,
     senderJid: normalized.senderJid ?? null,
+    senderName: normalized.senderName ?? null,
     fromMe: normalized.fromMe,
     timestamp: normalized.timestamp,
     messageType: normalized.messageType,

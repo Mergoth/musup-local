@@ -2,7 +2,6 @@ import fs from "fs";
 import { appLogger } from "../appLogger.js";
 import { recordEvent } from "../db/database.js";
 import {
-  escapeTelegramHtml,
   renderChatBlock,
   selectPictures,
   type StructuredSummary,
@@ -50,16 +49,13 @@ export async function deliverDigest(
     sentPictures: [],
   };
 
-  if (summary.chats.length === 0) {
-    const text = escapeTelegramHtml(summary.emptySummaryText);
-    for (const target of targets) await target.sendText(text);
-    return outcome;
-  }
+  // Nothing for the reader: post nothing rather than a "no updates" placeholder.
+  if (summary.chats.length === 0) return outcome;
 
   const byId = new Map(messages.map((message) => [message.messageId, message]));
 
   for (const chat of summary.chats) {
-    const block = renderChatBlock(chat, summary.noActionRequiredText);
+    const block = renderChatBlock(chat, summary.askedText);
 
     try {
       for (const target of targets) await target.sendText(block);

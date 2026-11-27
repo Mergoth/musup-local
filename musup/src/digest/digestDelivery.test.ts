@@ -45,18 +45,17 @@ const message = (messageId: string, chatJid: string, chatLabel: string, sendable
 });
 
 const summary: StructuredSummary = {
-  noActionRequiredText: "No action required",
+  askedText: "asks",
   emptySummaryText: "Nothing new",
   chats: [
     {
       chatJid: "a@g.us",
       chatName: "2B",
-      discussed: ["trip"],
-      conclusions: [],
-      actionItems: [],
+      actionItems: [{ requestedBy: "Ana", audience: "", action: "pay for the trip" }],
+      notes: [],
       pictures: [{ messageId: "p1", caption: "Flyer" }],
     },
-    { chatJid: "b@g.us", chatName: "Family", discussed: ["dinner"], conclusions: [], actionItems: [], pictures: [] },
+    { chatJid: "b@g.us", chatName: "Family", actionItems: [], notes: ["dinner moved to 8pm"], pictures: [] },
   ],
 };
 const messages = [message("p1", "a@g.us", "2B", true), message("t1", "b@g.us", "Family")];
@@ -94,10 +93,10 @@ test("a chat without chatJid fails by its name", async () => {
   assert.deepEqual([...result.failedChatJids], ["a@g.us"]);
 });
 
-test("an empty summary is sent once as plain text", async () => {
+test("an empty summary posts nothing", async () => {
   const { target, log } = recorder("telegram");
   await deliverDigest({ ...summary, chats: [] }, messages, [target], readFile);
-  assert.deepEqual(log, ["text:Nothing new"]);
+  assert.deepEqual(log, []);
 });
 
 test("a failed chat the model mislabelled blocks marking anything processed", async () => {

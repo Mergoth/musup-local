@@ -13,6 +13,8 @@ export type NormalizedMessage = {
   messageId: string;
   chatJid: string;
   senderJid?: string;
+  // The sender's own WhatsApp display name, as their phone reports it.
+  senderName?: string;
   fromMe: boolean;
   timestamp: number;
   messageType: string;
@@ -110,6 +112,7 @@ export function normalizeMessage(message: WAMessage): NormalizedMessage | null {
     messageId: key.id,
     chatJid: key.remoteJid,
     senderJid: key.participant || key.remoteJid || undefined,
+    senderName: message.pushName?.trim() || undefined,
     fromMe: Boolean(key.fromMe),
     timestamp:
       typeof message.messageTimestamp === "number"

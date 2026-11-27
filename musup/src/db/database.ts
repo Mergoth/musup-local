@@ -7,6 +7,8 @@ import { config } from "../config.js";
 export type AppSettings = {
   summarizationEnabled: boolean;
   summaryLanguage: string;
+  // Who reads the digest (family, roles, groups); decides which requests are relevant to them.
+  ownerProfile: string;
   whatsappDeliveryEnabled: boolean;
   whatsappDeliveryChatJid: string;
   telegramEnabled: boolean;
@@ -249,6 +251,7 @@ export async function initDatabase(): Promise<void> {
 
   seedSetting("summarizationEnabled", "false");
   seedSetting("summaryLanguage", "Russian");
+  seedSetting("ownerProfile", "");
   seedSetting("whatsappDeliveryEnabled", "false");
   seedSetting("whatsappDeliveryChatJid", "");
   seedSetting("telegramEnabled", "false");
@@ -279,6 +282,7 @@ export function getSettings(): AppSettings {
   return {
     summarizationEnabled: getSetting("summarizationEnabled") === "true",
     summaryLanguage: getSetting("summaryLanguage") || "Russian",
+    ownerProfile: getSetting("ownerProfile") || "",
     whatsappDeliveryEnabled: getSetting("whatsappDeliveryEnabled") === "true",
     whatsappDeliveryChatJid: getSetting("whatsappDeliveryChatJid") || "",
     telegramEnabled: getSetting("telegramEnabled") === "true",
@@ -319,6 +323,9 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   }
   if (typeof patch.summaryLanguage === "string") {
     setSettingValue("summaryLanguage", patch.summaryLanguage);
+  }
+  if (typeof patch.ownerProfile === "string") {
+    setSettingValue("ownerProfile", patch.ownerProfile);
   }
   if (typeof patch.whatsappDeliveryEnabled === "boolean") {
     setSettingValue("whatsappDeliveryEnabled", String(patch.whatsappDeliveryEnabled));

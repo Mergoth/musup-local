@@ -1,17 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseStructuredSummary, selectPictures } from "./structuredSummary.js";
+import { parseStructuredSummary, renderStructuredSummary, selectPictures } from "./structuredSummary.js";
 import type { WhatsappMessage } from "./types.js";
 
 test("parses pictures and drops entries without a messageId", () => {
   const parsed = parseStructuredSummary(
-    '{"chats":[{"chatJid":"a@g.us","chatName":"2B","discussed":[],"conclusions":[],"actionItems":[],"pictures":[{"messageId":"m1","caption":"Flyer"},{"caption":"no id"}]}]}',
+    '{"chats":[{"chatJid":"a@g.us","chatName":"2B","actionItems":[],"notes":["x"],"pictures":[{"messageId":"m1","caption":"Flyer"},{"caption":"no id"}]}]}',
   );
   assert.deepEqual(parsed.chats[0]?.pictures, [{ messageId: "m1", caption: "Flyer" }]);
 });
 
 test("missing pictures field parses as an empty list", () => {
-  const parsed = parseStructuredSummary('{"chats":[{"chatJid":"a@g.us","chatName":"2B","discussed":["x"]}]}');
+  const parsed = parseStructuredSummary('{"chats":[{"chatJid":"a@g.us","chatName":"2B","notes":["x"]}]}');
   assert.deepEqual(parsed.chats[0]?.pictures, []);
 });
 
@@ -37,9 +37,8 @@ test("only sendable pictures from the same chat are selected, once", () => {
   const chat = {
     chatJid: "a@g.us",
     chatName: "2B",
-    discussed: [],
-    conclusions: [],
     actionItems: [],
+    notes: [],
     pictures: [
       { messageId: "m1", caption: "Flyer" },
       { messageId: "m2", caption: "other chat" },
@@ -55,6 +54,46 @@ test("only sendable pictures from the same chat are selected, once", () => {
 
 test("chat without chatJid matches pictures by chat name", () => {
   const sendable = new Map([["m1", msg("m1", "a@g.us", true)]]);
-  const chat = { chatName: "2B", discussed: [], conclusions: [], actionItems: [], pictures: [{ messageId: "m1", caption: "x" }] };
+  const chat = { chatName: "2B", actionItems: [], notes: [], pictures: [{ messageId: "m1", caption: "x" }] };
   assert.equal(selectPictures(chat, sendable).length, 1);
+});
+
+test("chats with nothing for the reader are dropped", () => {
+  const parsed = parseStructuredSummary(
+    '{"chats":[{"chatName":"Kickboxing","actionItems":[],"notes":[]},{"chatName":"4B","notes":["Trip cancelled"]}]}',
+  );
+  assert.deepEqual(parsed.chats.map((chat) => chat.chatName), ["4B"]);
+});
+
+test("action items render with requester and audience", () => {
+  const parsed = parseStructuredSummary(JSON.stringify({
+    askedText: "просит",
+    chats: [{
+      chatName: "TKD",
+      actionItems: [
+        { requestedBy: "Артур", audience: "только чёрные пояса", action: "прийти на взвешивание 27.11" },
+        { requestedBy: "", audience: "", action: "оплатить взнос" },
+        "legacy string item",
+      ],
+      notes: ["Старт в 08:30"],
+    }],
+  }));
+  assert.equal(
+    renderStructuredSummary(parsed),
+    [
+      "<b>TKD</b>",
+      "✅ <b>Артур</b> просит (только чёрные пояса): прийти на взвешивание 27.11",
+      "✅ оплатить взнос",
+      "✅ legacy string item",
+      "ℹ️ Старт в 08:30",
+    ].join("\n"),
+  );
+});
+
+test("stray colons and brackets from the model are trimmed", () => {
+  const parsed = parseStructuredSummary(JSON.stringify({
+    askedText: "просит:",
+    chats: [{ chatName: "4B", actionItems: [{ requestedBy: "Lucía:", audience: "(только 4B)", action: "фото стр. 31" }] }],
+  }));
+  assert.match(renderStructuredSummary(parsed), /✅ <b>Lucía<\/b> просит \(только 4B\): фото стр\. 31$/);
 });

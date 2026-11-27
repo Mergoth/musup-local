@@ -48,6 +48,7 @@ function parseMessageLine(
       chatJid,
       chatName: typeof node.chatName === "string" ? node.chatName : undefined,
       senderJid: typeof node.senderJid === "string" ? node.senderJid : undefined,
+      senderName: typeof node.senderName === "string" ? node.senderName : undefined,
       fromMe: Boolean(node.fromMe),
       timestamp,
       messageType,

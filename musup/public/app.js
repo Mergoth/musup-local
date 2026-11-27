@@ -191,6 +191,7 @@ function renderSettings() {
     state.settings.summarizationEnabled,
   );
   $("#summary-language").value = state.settings.summaryLanguage || "Russian";
+  $("#owner-profile").value = state.settings.ownerProfile || "";
   $("#whatsapp-delivery-enabled").checked = Boolean(
     state.settings.whatsappDeliveryEnabled,
   );
@@ -788,6 +789,7 @@ async function saveDigestSettings(successText) {
     {
       summarizationEnabled: $("#summarization-enabled").checked,
       summaryLanguage: $("#summary-language").value.trim() || "Russian",
+      ownerProfile: $("#owner-profile").value.trim(),
       digestCron: buildDigestCron(),
       digestTimes:
         state.digestTimes.length > 0 ? state.digestTimes : ["09:00", "18:00"],
