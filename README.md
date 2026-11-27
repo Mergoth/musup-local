@@ -56,7 +56,7 @@ scripts/oracle/deploy.sh tunnel   # UI at http://localhost:8787 via SSH
 
 1. **Whatsapp** → scan the QR in WhatsApp → *Linked Devices*, then subscribe the chats you care about.
 2. **Config** → LLM endpoint + API key and summary language. Optionally fill the **Vision** and **Transcription** tabs to read pictures and voice notes (e.g. Gemini via AI Studio: `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`; a URL ending in `/audio/transcriptions` uses Whisper-style APIs). "⇉ copy to all" reuses a value across the three.
-3. **Config** → digest times, e.g. `08:00`, `21:00` (local time).
+3. **Config** → digest times, e.g. `08:00`, `21:00` (local time), and **About you**: who you are in these chats (e.g. *parent of a colour belt, not a coach*), so the digest keeps only requests meant for you.
 4. **Config** → Telegram bot token + chat IDs, and/or a WhatsApp delivery chat.
 5. **Config** → enable summarisation. Done — digests land in **Summaries** too.
 

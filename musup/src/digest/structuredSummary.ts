@@ -5,19 +5,27 @@ export type SummaryPicture = {
   caption: string;
 };
 
+// One request aimed at the reader: who asked, who it is for, and what to do (with when/where/what to bring).
+export type ActionItem = {
+  requestedBy: string;
+  audience: string;
+  action: string;
+};
+
 export type StructuredSummaryChat = {
   chatJid?: string;
   chatName: string;
-  discussed: string[];
-  conclusions: string[];
-  actionItems: string[];
+  actionItems: ActionItem[];
+  // Facts the reader should know that ask nothing of them; never a repeat of an action item.
+  notes: string[];
   pictures: SummaryPicture[];
 };
 
 export type SelectedPicture = SummaryPicture & { filePath: string };
 
 export type StructuredSummary = {
-  noActionRequiredText: string;
+  // The verb between the requester and the action, e.g. "asks" / "просит".
+  askedText: string;
   emptySummaryText: string;
   chats: StructuredSummaryChat[];
 };
@@ -45,6 +53,32 @@ function readString(value: unknown): string {
 function readStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map(readString).filter(Boolean);
+}
+
+// Models tend to add their own colon or brackets around these; the renderer adds them itself.
+function readLabel(value: unknown): string {
+  return readString(value)
+    .replace(/[\s:：,]+$/u, "")
+    .replace(/^\(([^()]*)\)$/su, "$1")
+    .replace(/[\s:：,]+$/u, "")
+    .trim();
+}
+
+// Older answers used plain strings; keep them as actions without a requester.
+function readActionItems(value: unknown): ActionItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item): ActionItem => {
+      if (typeof item === "string") return { requestedBy: "", audience: "", action: item.trim() };
+      if (!item || typeof item !== "object") return { requestedBy: "", audience: "", action: "" };
+      const raw = item as Record<string, unknown>;
+      return {
+        requestedBy: readLabel(raw.requestedBy),
+        audience: readLabel(raw.audience),
+        action: readString(raw.action),
+      };
+    })
+    .filter((item) => item.action);
 }
 
 function readPictures(value: unknown): SummaryPicture[] {
@@ -83,56 +117,44 @@ export function parseStructuredSummary(raw: string): StructuredSummary {
     .map((item) => ({
       chatJid: readString(item.chatJid) || undefined,
       chatName: readString(item.chatName) || readString(item.chatLabel) || "Unknown chat",
-      discussed: readStringArray(item.discussed),
-      conclusions: readStringArray(item.conclusions),
-      actionItems: readStringArray(item.actionItems),
+      actionItems: readActionItems(item.actionItems),
+      notes: readStringArray(item.notes),
       pictures: readPictures(item.pictures),
     }))
-    .filter(
-      (chat) =>
-        chat.chatName ||
-        chat.discussed.length > 0 ||
-        chat.conclusions.length > 0 ||
-        chat.actionItems.length > 0,
-    );
+    // A chat with nothing for the reader is not posted at all.
+    .filter((chat) => chat.actionItems.length > 0 || chat.notes.length > 0 || chat.pictures.length > 0);
 
   return {
-    noActionRequiredText: readString(root.noActionRequiredText) || "No action required",
+    askedText: readLabel(root.askedText) || "asks",
     emptySummaryText: readString(root.emptySummaryText) || "No meaningful updates",
     chats,
   };
 }
 
-function renderBulletList(items: string[], marker: string): string[] {
-  return items.map((item) => `${marker} ${escapeTelegramHtml(item)}`);
+function renderActionItem(item: ActionItem, askedText: string): string {
+  const action = escapeTelegramHtml(item.action);
+  const audience = escapeTelegramHtml(item.audience);
+  if (!item.requestedBy) return `✅ ${audience ? `${audience}: ` : ""}${action}`;
+  const requester = `<b>${escapeTelegramHtml(item.requestedBy)}</b> ${escapeTelegramHtml(askedText)}`;
+  return `✅ ${requester}${audience ? ` (${audience})` : ""}: ${action}`;
 }
 
-export function renderChatBlock(chat: StructuredSummaryChat, noActionRequiredText: string): string {
-  const lines = [`<b>${escapeTelegramHtml(chat.chatName)}</b>`];
-
-  lines.push("", "<b>Discussed</b>");
-  lines.push(...(chat.discussed.length > 0 ? renderBulletList(chat.discussed, "•") : ["• -"]));
-
-  lines.push("", "<b>Conclusions</b>");
-  lines.push(...(chat.conclusions.length > 0 ? renderBulletList(chat.conclusions, "•") : ["• -"]));
-
-  lines.push("", "<b>Action items</b>");
-  lines.push(
-    ...(chat.actionItems.length > 0
-      ? renderBulletList(chat.actionItems, "✅")
-      : [`✅ ${escapeTelegramHtml(noActionRequiredText)}`]),
-  );
-
-  return lines.join("\n");
+export function renderChatBlock(chat: StructuredSummaryChat, askedText: string): string {
+  return [
+    `<b>${escapeTelegramHtml(chat.chatName)}</b>`,
+    ...chat.actionItems.map((item) => renderActionItem(item, askedText)),
+    ...chat.notes.map((note) => `ℹ️ ${escapeTelegramHtml(note)}`),
+  ].join("\n");
 }
 
+// Used for the summaries journal; with no chats nothing is delivered.
 export function renderStructuredSummary(summary: StructuredSummary): string {
   if (summary.chats.length === 0) {
     return escapeTelegramHtml(summary.emptySummaryText);
   }
 
   return summary.chats
-    .map((chat) => renderChatBlock(chat, summary.noActionRequiredText))
+    .map((chat) => renderChatBlock(chat, summary.askedText))
     .join("\n\n");
 }
 

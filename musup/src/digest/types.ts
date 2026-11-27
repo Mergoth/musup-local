@@ -3,6 +3,7 @@ export type WhatsappMessage = {
   chatJid: string;
   chatLabel: string;
   senderJid?: string;
+  senderName?: string;
   fromMe: boolean;
   timestamp: number;
   messageDateUtc: string;

@@ -119,6 +119,7 @@ function cleanSettingsPatch(input: unknown): Partial<AppSettings> {
     patch.summarizationEnabled = raw.summarizationEnabled;
   }
   if (typeof raw.summaryLanguage === "string") patch.summaryLanguage = raw.summaryLanguage;
+  if (typeof raw.ownerProfile === "string") patch.ownerProfile = raw.ownerProfile;
   if (typeof raw.whatsappDeliveryEnabled === "boolean") {
     patch.whatsappDeliveryEnabled = raw.whatsappDeliveryEnabled;
   }

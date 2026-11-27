@@ -19,12 +19,18 @@ test("truncation never leaves half an HTML entity", () => {
   assert.match(caption, /^(&amp;)+…$/);
 });
 
-test("a chat block has its name and a no-action line", () => {
+test("a chat block has its name, its requests and its notes", () => {
   const block = renderChatBlock(
-    { chatName: "Clase 2B", discussed: ["Excursión"], conclusions: [], actionItems: [], pictures: [] },
-    "No action required",
+    {
+      chatName: "Clase 2B",
+      actionItems: [{ requestedBy: "Ana", audience: "", action: "traer la autorización firmada" }],
+      notes: ["Excursión el viernes"],
+      pictures: [],
+    },
+    "pide",
   );
   assert.match(block, /^<b>Clase 2B<\/b>/);
-  assert.match(block, /✅ No action required/);
-  assert.match(block, /• Excursión/);
+  assert.match(block, /✅ <b>Ana<\/b> pide: traer la autorización firmada/);
+  assert.match(block, /ℹ️ Excursión el viernes/);
+  assert.doesNotMatch(block, /Discussed|Conclusions|No action/);
 });

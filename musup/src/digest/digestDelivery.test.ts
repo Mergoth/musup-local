@@ -8,7 +8,7 @@ import type { StructuredSummary } from "./structuredSummary.js";
 import type { WhatsappMessage } from "./types.js";
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "musup-test-"));
-const { initDatabase } = await import("../db/database.js");
+const { initDatabase, listEvents } = await import("../db/database.js");
 const { deliverDigest } = await import("./digestDelivery.js");
 
 before(async () => {
@@ -45,18 +45,17 @@ const message = (messageId: string, chatJid: string, chatLabel: string, sendable
 });
 
 const summary: StructuredSummary = {
-  noActionRequiredText: "No action required",
+  askedText: "asks",
   emptySummaryText: "Nothing new",
   chats: [
     {
       chatJid: "a@g.us",
       chatName: "2B",
-      discussed: ["trip"],
-      conclusions: [],
-      actionItems: [],
+      actionItems: [{ requestedBy: "Ana", audience: "", action: "pay for the trip" }],
+      notes: [],
       pictures: [{ messageId: "p1", caption: "Flyer" }],
     },
-    { chatJid: "b@g.us", chatName: "Family", discussed: ["dinner"], conclusions: [], actionItems: [], pictures: [] },
+    { chatJid: "b@g.us", chatName: "Family", actionItems: [], notes: ["dinner moved to 8pm"], pictures: [] },
   ],
 };
 const messages = [message("p1", "a@g.us", "2B", true), message("t1", "b@g.us", "Family")];
@@ -94,10 +93,79 @@ test("a chat without chatJid fails by its name", async () => {
   assert.deepEqual([...result.failedChatJids], ["a@g.us"]);
 });
 
-test("an empty summary is sent once as plain text", async () => {
+test("an empty summary posts nothing and records an event", async () => {
   const { target, log } = recorder("telegram");
   await deliverDigest({ ...summary, chats: [] }, messages, [target], readFile);
-  assert.deepEqual(log, ["text:Nothing new"]);
+  assert.deepEqual(log, []);
+  const event = listEvents(10).find((e) => e.type === "digest.nothing_for_reader");
+  assert.ok(event);
+  assert.equal(event.level, "info");
+});
+
+test("picture-only chat delivers its picture", async () => {
+  const pictureOnlySummary: StructuredSummary = {
+    askedText: "asks",
+    emptySummaryText: "Nothing new",
+    chats: [
+      {
+        chatJid: "a@g.us",
+        chatName: "2B",
+        actionItems: [],
+        notes: [],
+        pictures: [{ messageId: "p1", caption: "Flyer" }],
+      },
+    ],
+  };
+  const { target, log } = recorder("telegram");
+  const result = await deliverDigest(pictureOnlySummary, messages, [target], readFile);
+  assert.deepEqual(log, ["text:<b>2B</b>", "photo:Flyer"]);
+  assert.equal(result.deliveredChats, 1);
+  assert.equal(result.skippedChats, 0);
+  assert.deepEqual(result.sentPictures, [{ messageId: "p1", caption: "Flyer" }]);
+  assert.equal(result.failedChatJids.size, 0);
+});
+
+test("picture-only chat with an unknown messageId posts nothing and is not in failedChatJids", async () => {
+  const unsendableSummary: StructuredSummary = {
+    askedText: "asks",
+    emptySummaryText: "Nothing new",
+    chats: [
+      {
+        chatJid: "a@g.us",
+        chatName: "2B",
+        actionItems: [],
+        notes: [],
+        pictures: [{ messageId: "made-up", caption: "Flyer" }],
+      },
+    ],
+  };
+  const { target, log } = recorder("telegram");
+  const result = await deliverDigest(unsendableSummary, messages, [target], readFile);
+  assert.deepEqual(log, []);
+  assert.equal(result.deliveredChats, 0);
+  assert.equal(result.skippedChats, 1);
+  assert.equal(result.failedChatJids.size, 0);
+});
+
+test("a summary whose only chat is skipped records digest.nothing_for_reader", async () => {
+  const unsendableSummary: StructuredSummary = {
+    askedText: "asks",
+    emptySummaryText: "Nothing new",
+    chats: [
+      {
+        chatJid: "a@g.us",
+        chatName: "2B",
+        actionItems: [],
+        notes: [],
+        pictures: [{ messageId: "made-up", caption: "Flyer" }],
+      },
+    ],
+  };
+  const { target } = recorder("telegram");
+  await deliverDigest(unsendableSummary, messages, [target], readFile);
+  const event = listEvents(1)[0];
+  assert.equal(event?.type, "digest.nothing_for_reader");
+  assert.equal(event?.level, "info");
 });
 
 test("a failed chat the model mislabelled blocks marking anything processed", async () => {
