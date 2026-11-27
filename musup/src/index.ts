@@ -299,7 +299,7 @@ async function startCollector() {
       const chatName = await resolveChatName(
         sock,
         normalized.chatJid,
-        message.pushName ?? undefined
+        normalized.fromMe ? undefined : (message.pushName ?? undefined)
       );
       await saveNormalizedMessage(
         message,
@@ -322,7 +322,7 @@ async function startCollector() {
       const chatName = await resolveChatName(
         sock,
         normalized.chatJid,
-        message.pushName ?? undefined,
+        normalized.fromMe ? undefined : (message.pushName ?? undefined),
       );
       if (await saveNormalizedMessage(message, normalized, chatName, "history", downloadMedia)) {
         saved += 1;

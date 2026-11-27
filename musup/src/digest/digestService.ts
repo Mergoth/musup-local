@@ -139,7 +139,11 @@ export async function runDigest(): Promise<DigestResult> {
     }
 
     const delivery = await deliverDigest(structured, messages, targets);
-    if (targets.length > 0 && structured.chats.length > 0 && delivery.deliveredChats === 0) {
+    if (
+      targets.length > 0 &&
+      structured.chats.length > 0 &&
+      delivery.deliveredChats + delivery.skippedChats === 0
+    ) {
       throw new Error("Digest delivery failed for every chat");
     }
     if (settings.whatsappDeliveryEnabled) {

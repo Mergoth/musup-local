@@ -76,9 +76,9 @@ export function senderLabel(
   lookupContactName: (jid: string) => string | undefined = () => undefined,
 ): string {
   if (message.fromMe) return "Me";
+  if (isReadableName(message.senderName)) return message.senderName;
   const contactName = message.senderJid ? lookupContactName(message.senderJid) : undefined;
   if (isReadableName(contactName)) return contactName;
-  if (isReadableName(message.senderName)) return message.senderName;
   return phoneNumber(message.senderJid) || "Unknown sender";
 }
 

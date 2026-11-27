@@ -15,6 +15,14 @@ test("missing pictures field parses as an empty list", () => {
   assert.deepEqual(parsed.chats[0]?.pictures, []);
 });
 
+test("picture-only chat survives parsing", () => {
+  const parsed = parseStructuredSummary(
+    '{"chats":[{"chatJid":"a@g.us","chatName":"2B","actionItems":[],"notes":[],"pictures":[{"messageId":"m1","caption":"Flyer"}]}]}',
+  );
+  assert.equal(parsed.chats.length, 1);
+  assert.deepEqual(parsed.chats[0]?.pictures, [{ messageId: "m1", caption: "Flyer" }]);
+});
+
 function msg(messageId: string, chatJid: string, sendablePicture: boolean): WhatsappMessage {
   return {
     messageId,
@@ -96,4 +104,25 @@ test("stray colons and brackets from the model are trimmed", () => {
     chats: [{ chatName: "4B", actionItems: [{ requestedBy: "Lucía:", audience: "(только 4B)", action: "фото стр. 31" }] }],
   }));
   assert.match(renderStructuredSummary(parsed), /✅ <b>Lucía<\/b> просит \(только 4B\): фото стр\. 31$/);
+});
+
+test("readLabel rules via parseStructuredSummary", () => {
+  const parsed = parseStructuredSummary(JSON.stringify({
+    askedText: "просит:",
+    chats: [{
+      chatName: "4B",
+      actionItems: [
+        { requestedBy: "Jr.", audience: "(A) or (B)", action: "read" },
+        { requestedBy: "Lucía:", audience: "(только 4B)", action: "write" },
+        { requestedBy: "Doctor, ", audience: "group A,  ", action: "bring test" },
+      ],
+    }],
+  }));
+  assert.equal(parsed.askedText, "просит");
+  assert.equal(parsed.chats[0]?.actionItems[0]?.requestedBy, "Jr.");
+  assert.equal(parsed.chats[0]?.actionItems[0]?.audience, "(A) or (B)");
+  assert.equal(parsed.chats[0]?.actionItems[1]?.requestedBy, "Lucía");
+  assert.equal(parsed.chats[0]?.actionItems[1]?.audience, "только 4B");
+  assert.equal(parsed.chats[0]?.actionItems[2]?.requestedBy, "Doctor");
+  assert.equal(parsed.chats[0]?.actionItems[2]?.audience, "group A");
 });

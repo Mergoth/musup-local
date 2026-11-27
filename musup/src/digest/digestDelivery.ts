@@ -18,6 +18,7 @@ export type DeliveryTarget = {
 
 export type DeliveryOutcome = {
   deliveredChats: number;
+  skippedChats: number;
   failedChatJids: Set<string>;
   // A chat failed but could not be matched to its messages; nothing should be marked processed.
   unresolvedFailure: boolean;
@@ -44,17 +45,27 @@ export async function deliverDigest(
 ): Promise<DeliveryOutcome> {
   const outcome: DeliveryOutcome = {
     deliveredChats: 0,
+    skippedChats: 0,
     failedChatJids: new Set(),
     unresolvedFailure: false,
     sentPictures: [],
   };
 
   // Nothing for the reader: post nothing rather than a "no updates" placeholder.
-  if (summary.chats.length === 0) return outcome;
+  if (summary.chats.length === 0) {
+    recordEvent("info", "digest.nothing_for_reader", "Nothing for reader in digest");
+    return outcome;
+  }
 
   const byId = new Map(messages.map((message) => [message.messageId, message]));
 
   for (const chat of summary.chats) {
+    const pictures = selectPictures(chat, byId);
+    if (chat.actionItems.length === 0 && chat.notes.length === 0 && pictures.length === 0) {
+      outcome.skippedChats += 1;
+      continue;
+    }
+
     const block = renderChatBlock(chat, summary.askedText);
 
     try {
@@ -72,7 +83,7 @@ export async function deliverDigest(
     }
     outcome.deliveredChats += 1;
 
-    for (const picture of selectPictures(chat, byId)) {
+    for (const picture of pictures) {
       let sent = false;
       try {
         const photo = readFile(picture.filePath);
@@ -96,6 +107,10 @@ export async function deliverDigest(
       }
       if (sent) outcome.sentPictures.push({ messageId: picture.messageId, caption: picture.caption });
     }
+  }
+
+  if (outcome.skippedChats === summary.chats.length) {
+    recordEvent("info", "digest.nothing_for_reader", "Nothing for reader in digest");
   }
 
   return outcome;

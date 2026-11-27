@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { WAMessage } from "@whiskeysockets/baileys";
-import { classifyMedia } from "./normalize.js";
+import { classifyMedia, normalizeMessage } from "./normalize.js";
 
 const wa = (message: unknown) => ({ key: { id: "m", remoteJid: "a@g.us" }, message }) as WAMessage;
 
@@ -43,4 +43,20 @@ test("view-once voice note is flagged", () => {
 test("videos and stickers are ignored", () => {
   assert.equal(classifyMedia(wa({ videoMessage: { mimetype: "video/mp4" } })), undefined);
   assert.equal(classifyMedia(wa({ stickerMessage: { mimetype: "image/webp" } })), undefined);
+});
+
+test("normalizeMessage maps pushName to senderName and blanks to undefined", () => {
+  const msgWithPushName = {
+    key: { id: "m1", remoteJid: "a@g.us" },
+    pushName: "Arthur",
+    message: { conversation: "hello" },
+  } as WAMessage;
+  assert.equal(normalizeMessage(msgWithPushName)?.senderName, "Arthur");
+
+  const msgWithBlankPushName = {
+    key: { id: "m2", remoteJid: "a@g.us" },
+    pushName: "   ",
+    message: { conversation: "hello" },
+  } as WAMessage;
+  assert.equal(normalizeMessage(msgWithBlankPushName)?.senderName, undefined);
 });

@@ -58,8 +58,9 @@ function readStringArray(value: unknown): string[] {
 // Models tend to add their own colon or brackets around these; the renderer adds them itself.
 function readLabel(value: unknown): string {
   return readString(value)
-    .replace(/[\s:：,.\-–—]+$/u, "")
-    .replace(/^\((.*)\)$/su, "$1")
+    .replace(/[\s:：,]+$/u, "")
+    .replace(/^\(([^()]*)\)$/su, "$1")
+    .replace(/[\s:：,]+$/u, "")
     .trim();
 }
 
@@ -121,7 +122,7 @@ export function parseStructuredSummary(raw: string): StructuredSummary {
       pictures: readPictures(item.pictures),
     }))
     // A chat with nothing for the reader is not posted at all.
-    .filter((chat) => chat.actionItems.length > 0 || chat.notes.length > 0);
+    .filter((chat) => chat.actionItems.length > 0 || chat.notes.length > 0 || chat.pictures.length > 0);
 
   return {
     askedText: readLabel(root.askedText) || "asks",
